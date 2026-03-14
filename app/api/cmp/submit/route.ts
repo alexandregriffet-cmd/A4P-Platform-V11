@@ -9,6 +9,7 @@ const supabase = createClient(
 type Answers = Record<string, number>
 
 function normalizeScore(values: number[]) {
+  if (!values.length) return 0
   const avg = values.reduce((a, b) => a + b, 0) / values.length
   return Math.round(((avg - 1) / 4) * 100)
 }
@@ -28,7 +29,8 @@ function computeCMP(answers: Answers) {
 
   let profile_code = 'CMP-4'
   let profile_name = 'Fonctionnement mental intermédiaire'
-  let summary = 'Le profil présente un socle mental exploitable avec des axes de progression identifiables.'
+  let summary =
+    'Le profil présente un socle mental exploitable avec des axes de progression identifiables.'
 
   if (engagement >= 70 && regulation < 60) {
     profile_code = 'CMP-2'
@@ -65,12 +67,16 @@ export async function POST(req: Request) {
   try {
     const body = await req.json()
 
+    const mode = String(body.mode ?? 'individual')
+    const token = body.token ? String(body.token) : null
+    const clubId = body.clubId ? String(body.clubId) : null
+    const teamId = body.teamId ? String(body.teamId) : null
     const firstname = String(body.firstname ?? '').trim()
     const lastname = String(body.lastname ?? '').trim()
     const email = String(body.email ?? '').trim()
-    const answers = body.answers as Answers
+    const answers = (body.answers ?? {}) as Answers
 
-    if (!firstname || !lastname || !email || !answers) {
+    if (!firstname || !lastname || !Object.keys(answers).length) {
       return NextResponse.json(
         { ok: false, error: 'Données incomplètes.' },
         { status: 400 }
@@ -79,30 +85,45 @@ export async function POST(req: Request) {
 
     const result = computeCMP(answers)
 
-    const { error } = await supabase.from('tests').insert({
+    const payload = {
+      source: mode === 'club' ? 'club' : 'individual',
       module: 'CMP',
+      club_id: clubId,
+      team_id: teamId,
+      passation_id: token,
       player_firstname: firstname,
       player_lastname: lastname,
+      player_email: email || null,
       score_global: result.score_global,
       dimensions: result.dimensions,
       profile_code: result.profile_code,
-      profile_name: result.profile_name
-    })
+      profile_name: result.profile_name,
+      summary: result.summary,
+      raw_answers: answers
+    }
+
+    const { error } = await supabase.from('tests').insert(payload)
 
     if (error) {
       return NextResponse.json(
-        { ok: false, error: error.message },
+        { ok: false, error: error.message, debug: payload },
         { status: 500 }
       )
     }
 
     return NextResponse.json({
       ok: true,
+      score_global: result.score_global,
+      profile_name: result.profile_name,
+      profile_code: result.profile_code,
+      summary: result.summary,
+      dimensions: result.dimensions,
       result
     })
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Erreur serveur inconnue'
+
     return NextResponse.json(
       { ok: false, error: message },
       { status: 500 }
