@@ -1,61 +1,24 @@
-# A4P Platform V11
+# A4P ULTIMATE PLATFORM + HUB INTEGRATION
 
-Version opérationnelle de base avec :
-- Supabase branché
-- comptes utilisateurs
-- passation réelle CMP
-- stockage des résultats
-- dashboard dynamique
-- email automatique des résultats
-- admin A4P
+Ce pack combine :
+- le portail A4P Ultimate Platform
+- les liens avec le hub diagnostique A4P
+- l'ouverture des 3 moteurs de tests existants
 
-## 1. Installation
+## Liens utilisés
+- Hub diagnostique : https://alexandregriffet-cmd.github.io/A4P-Diagnostic-Academie-de-Performances-/
+- CMP : https://alexandregriffet-cmd.github.io/CMP-A4P-ACADEMIE-DE-PERFORMANCES-/
+- PMP : https://alexandregriffet-cmd.github.io/PMP-A4P-Acad-mie-de-Performances-/
+- PSYCHO : https://alexandregriffet-cmd.github.io/Module-psycho-motionnelle/
 
-```bash
-npm install
-cp .env.example .env.local
-npm run dev
-```
+## Ce que fait le pack
+- ajoute un portail principal relié au hub
+- ajoute des boutons "Retour au hub diagnostique"
+- ouvre les 3 tests existants
+- prépare l'ingestion des résultats dans Supabase via `/api/results/ingest`
 
-## 2. Supabase
-
-1. Crée un projet Supabase.
-2. Copie les clés API dans `.env.local`.
-3. Exécute `sql/schema.sql` dans l’éditeur SQL Supabase.
-4. Crée au moins un club et une équipe via le dashboard ou directement dans Supabase.
-
-## 3. Email résultats
-
-Cette V11 utilise **Resend**.
-
-Renseigne :
-- `RESEND_API_KEY`
-- `RESULTS_EMAIL_TO=alexandre.griffet@yahoo.fr`
-- `RESULTS_EMAIL_FROM`
-
-À chaque soumission CMP :
-1. le résultat est stocké dans `tests`
-2. un email est envoyé à Alexandre
-3. le log est stocké dans `email_logs`
-
-## 4. Routes principales
-
-- `/` : portail principal
-- `/login` : connexion
-- `/signup` : création de compte
-- `/dashboard` : dashboard global
-- `/individuel` : entrée individuelle
-- `/individuel/tests/cmp` : CMP individuel
-- `/club` : entrée club
-- `/club/equipes` : équipes
-- `/club/passations/create` : création passation club
-- `/passation/[token]` : passation publique joueur
-- `/admin` : back-office A4P
-
-## 5. Important
-
-Cette V11 est prête à être branchée et testée. Pour qu’elle fonctionne réellement en production, tu dois :
-- créer le projet Supabase
-- configurer les variables d’environnement
-- déployer sur Vercel
-- configurer le domaine d’envoi Resend
+## Important
+Pour que les résultats remontent automatiquement :
+- exécuter `sql/schema_master.sql` dans Supabase
+- déployer le portail sur Vercel
+- injecter les adaptateurs dans les 3 moteurs de tests existants
