@@ -1,5 +1,6 @@
 'use client'
-import { useState, Suspense } from 'react'
+
+import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -11,9 +12,9 @@ function CreatePassationInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const [playerDbId, setPlayerDbId] = useState(searchParams.get('playerDbId') || '')
-  const [teamDbId, setTeamDbId] = useState(searchParams.get('teamDbId') || '')
-  const [clubId, setClubId] = useState(searchParams.get('clubId') || '')
+  const [playerId, setPlayerId] = useState(searchParams.get('playerId') || '')
+  const [teamId, setTeamId] = useState(searchParams.get('teamId') || '')
+  const [clubId, setClubId] = useState('')
   const [moduleName, setModuleName] = useState('CMP')
   const [loading, setLoading] = useState(false)
 
@@ -26,8 +27,8 @@ function CreatePassationInner() {
     const { error } = await supabase
       .from('passations')
       .insert({
-        player_id: playerDbId || null,
-        team_id: teamDbId || null,
+        player_id: playerId || null,
+        team_id: teamId || null,
         club_id: clubId || null,
         module: moduleName,
         token,
@@ -48,15 +49,29 @@ function CreatePassationInner() {
     <main style={{ maxWidth: 760, margin: '40px auto', padding: 20 }}>
       <h1>Créer une passation</h1>
       <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
-        <input value={playerDbId} onChange={(e) => setPlayerDbId(e.target.value)} placeholder="ID joueur (base)" />
-        <input value={teamDbId} onChange={(e) => setTeamDbId(e.target.value)} placeholder="ID équipe (base)" />
-        <input value={clubId} onChange={(e) => setClubId(e.target.value)} placeholder="ID club" />
+        <input
+          value={playerId}
+          onChange={(e) => setPlayerId(e.target.value)}
+          placeholder="ID joueur"
+        />
+        <input
+          value={teamId}
+          onChange={(e) => setTeamId(e.target.value)}
+          placeholder="ID équipe"
+        />
+        <input
+          value={clubId}
+          onChange={(e) => setClubId(e.target.value)}
+          placeholder="ID club (optionnel)"
+        />
         <select value={moduleName} onChange={(e) => setModuleName(e.target.value)}>
           <option value="CMP">CMP</option>
           <option value="PMP">PMP</option>
           <option value="PSYCHO">PSYCHO</option>
         </select>
-        <button type="submit" disabled={loading}>{loading ? 'Génération…' : 'Créer passation'}</button>
+        <button type="submit" disabled={loading}>
+          {loading ? 'Génération…' : 'Créer passation'}
+        </button>
       </form>
     </main>
   )
