@@ -39,7 +39,12 @@ function CreatePlayerInner() {
     }
 
     alert('Joueur créé')
-    router.push(`/passations/create?playerId=${data.id}&teamId=${teamId}`)
+
+    const params = new URLSearchParams()
+    params.set('playerId', data.id)
+    if (teamId) params.set('teamId', teamId)
+
+    router.push(`/passations/create?${params.toString()}`)
   }
 
   return (
@@ -49,8 +54,7 @@ function CreatePlayerInner() {
         <input
           value={teamId}
           onChange={(e) => setTeamId(e.target.value)}
-          placeholder="ID équipe"
-          required
+          placeholder="ID équipe (optionnel)"
         />
         <input
           value={firstname}
