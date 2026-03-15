@@ -1,12 +1,10 @@
 'use client'
 import { useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 
 export default function CreatePlayerPage() {
-  const params = useSearchParams()
-  const teamIdDefault = params.get('teamId') || ''
-  const [teamId, setTeamId] = useState(teamIdDefault)
+  const [teamId, setTeamId] = useState('')
   const [firstname, setFirstname] = useState('')
   const [lastname, setLastname] = useState('')
   const [position, setPosition] = useState('')
@@ -14,7 +12,14 @@ export default function CreatePlayerPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const { error } = await supabase.from('players').insert({ team_id: teamId, firstname, lastname, position })
+    const { error } = await supabase.from('players').insert({
+      team_id: teamId,
+      firstname,
+      lastname,
+      position,
+      first_name: firstname,
+      last_name: lastname
+    })
     if (error) return alert(error.message)
     router.push(`/teams/${teamId}`)
   }
