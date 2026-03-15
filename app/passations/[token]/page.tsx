@@ -7,7 +7,10 @@ type Props = {
 
 function getServerClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
   return createClient(url, key)
 }
 
@@ -31,6 +34,7 @@ export default async function PassationTokenPage({ params }: Props) {
   }
 
   const moduleName = passation.module || 'CMP'
+
   const moduleUrlMap: Record<string, string> = {
     CMP: 'https://alexandregriffet-cmd.github.io/CMP-A4P-ACADEMIE-DE-PERFORMANCES-/',
     PMP: 'https://alexandregriffet-cmd.github.io/PMP-A4P-Acad-mie-de-Performances-/',
@@ -47,12 +51,31 @@ export default async function PassationTokenPage({ params }: Props) {
       <p><strong>Statut :</strong> {passation.status || 'pending'}</p>
 
       <div style={{ display: 'grid', gap: 12, marginTop: 24 }}>
-        <a href={launchUrl} style={{ padding: 14, background: '#173A73', color: 'white', textDecoration: 'none', borderRadius: 8, textAlign: 'center' }}>
+        <a
+          href={launchUrl}
+          style={{
+            padding: 14,
+            background: '#173A73',
+            color: 'white',
+            textDecoration: 'none',
+            borderRadius: 8,
+            textAlign: 'center'
+          }}
+        >
           Ouvrir le test {moduleName}
         </a>
-        <div style={{ padding: 14, border: '1px solid #ddd', borderRadius: 8, wordBreak: 'break-all' }}>
+
+        <div
+          style={{
+            padding: 14,
+            border: '1px solid #ddd',
+            borderRadius: 8,
+            wordBreak: 'break-all'
+          }}
+        >
           {launchUrl}
         </div>
+
         <Link href="/passations/create">Créer une autre passation</Link>
       </div>
     </main>
