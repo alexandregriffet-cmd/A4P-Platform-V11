@@ -1,176 +1,61 @@
 'use client'
 
 import { useState } from 'react'
-import { CMP_QUESTIONS } from '@/lib/cmp-questions'
 
-type Props = {
-  mode: 'individual' | 'club'
-  token?: string
-  clubId?: string
-  teamId?: string
-}
+export default function CMPForm() {
+  const [status, setStatus] = useState('')
 
-type ResultType = {
-  score_global?: number
-  score?: number
-  global_score?: number
-  dimensions?: {
-    confiance?: number
-    regulation?: number
-    engagement?: number
-    stabilite?: number
-  }
-  profile_code?: string
-  profile_name?: string
-  profil_nom?: string
-  profile?: string
-  summary?: string
-  resume?: string
-  description?: string
-  [key: string]: any
-}
-
-export default function CMPForm({ mode, token, clubId, teamId }: Props) {
-  const [firstname, setFirstname] = useState('')
-  const [lastname, setLastname] = useState('')
-  const [email, setEmail] = useState('')
-  const [answers, setAnswers] = useState<Record<string, number>>({})
-  const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<ResultType | null>(null)
-
-  function setAnswer(id: string, value: number) {
-    setAnswers((prev) => ({ ...prev, [id]: value }))
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    setLoading(true)
+    setStatus('Envoi en cours…')
+
+    const formData = new FormData(e.currentTarget)
+    const payload = {
+      firstname: String(formData.get('firstname') || ''),
+      lastname: String(formData.get('lastname') || ''),
+      email: String(formData.get('email') || ''),
+      club_name: String(formData.get('club_name') || ''),
+      team_name: String(formData.get('team_name') || ''),
+      module: 'CMP',
+      score_global: Number(formData.get('score_global') || 0),
+      profile_name: String(formData.get('profile_name') || ''),
+      dimensions: {
+        confiance: Number(formData.get('confiance') || 0),
+        focus: Number(formData.get('focus') || 0),
+        motivation: Number(formData.get('motivation') || 0),
+        regulation: Number(formData.get('regulation') || 0),
+      },
+    }
 
     try {
-      const response = await fetch('/api/cmp/submit', {
+      const res = await fetch('/api/results/ingest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mode,
-          token,
-          clubId,
-          teamId,
-          firstname,
-          lastname,
-          email,
-          answers
-        })
+        body: JSON.stringify(payload),
       })
 
-      const data = await response.json()
-
-      if (!response.ok || !data.ok) {
-        alert(data.error || 'Erreur lors de la soumission.')
-        return
-      }
-
-      setResult(data.result ?? data)
-    } catch (error) {
-      alert('Erreur réseau ou serveur.')
-    } finally {
-      setLoading(false)
+      if (!res.ok) throw new Error('submit_failed')
+      setStatus('Résultat CMP enregistré.')
+    } catch {
+      setStatus('Erreur lors de l’enregistrement.')
     }
   }
 
-  const displayScore =
-    result?.score_global ?? result?.score ?? result?.global_score ?? 'non reçu'
-
-  const displayProfile =
-    result?.profile_name ?? result?.profil_nom ?? result?.profile ?? 'non reçu'
-
-  const displaySummary =
-    result?.summary ??
-    result?.resume ??
-    result?.description ??
-    'Aucune synthèse reçue.'
-
   return (
-    <div className="split">
-      <form onSubmit={handleSubmit} className="stack">
-        <div className="card">
-          <h2>Identification</h2>
-
-          <input
-            value={firstname}
-            onChange={(e) => setFirstname(e.target.value)}
-            placeholder="Prénom"
-            required
-          />
-
-          <input
-            value={lastname}
-            onChange={(e) => setLastname(e.target.value)}
-            placeholder="Nom"
-            required
-          />
-
-          {mode === 'individual' ? (
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email"
-              required
-            />
-          ) : null}
-        </div>
-
-        <div className="card">
-          <h2>Questionnaire CMP</h2>
-
-          {CMP_QUESTIONS.map((q) => (
-            <div key={q.id} className="qcard">
-              <p>{q.text}</p>
-
-              <div className="likert">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <label key={n}>
-                    <input
-                      type="radio"
-                      name={q.id}
-                      checked={answers[q.id] === n}
-                      onChange={() => setAnswer(q.id, n)}
-                      required
-                    />
-                    <span>{n}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          ))}
-
-          <button className="btn" type="submit" disabled={loading}>
-            {loading ? 'Envoi...' : 'Valider le CMP'}
-          </button>
-        </div>
-      </form>
-
-      <div className="card">
-        <h2>Résultat</h2>
-
-        {!result ? (
-          <p className="small">Le résultat s’affichera ici après validation.</p>
-        ) : (
-          <>
-            <p>
-              <strong>Score global :</strong> {String(displayScore)}/100
-            </p>
-
-            <p>
-              <strong>Profil :</strong> {String(displayProfile)}
-            </p>
-
-            <p>{String(displaySummary)}</p>
-
-            <pre className="codebox">{JSON.stringify(result, null, 2)}</pre>
-          </>
-        )}
-      </div>
-    </div>
+    <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12, maxWidth: 700 }}>
+      <input name="firstname" placeholder="Prénom" />
+      <input name="lastname" placeholder="Nom" />
+      <input name="email" placeholder="Email" />
+      <input name="club_name" placeholder="Club" />
+      <input name="team_name" placeholder="Équipe" />
+      <input name="score_global" type="number" placeholder="Score global" />
+      <input name="profile_name" placeholder="Profil" />
+      <input name="confiance" type="number" placeholder="Confiance" />
+      <input name="focus" type="number" placeholder="Focus" />
+      <input name="motivation" type="number" placeholder="Motivation" />
+      <input name="regulation" type="number" placeholder="Régulation" />
+      <button type="submit">Enregistrer</button>
+      {status ? <p>{status}</p> : null}
+    </form>
   )
 }
