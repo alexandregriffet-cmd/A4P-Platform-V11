@@ -33,6 +33,18 @@ export default async function PassationTokenPage({ params }: Props) {
     )
   }
 
+  let player: any = null
+
+  if (passation.player_id) {
+    const { data } = await supabase
+      .from('players')
+      .select('*')
+      .eq('player_id', passation.player_id)
+      .single()
+
+    player = data
+  }
+
   const moduleName = passation.module || 'CMP'
 
   const moduleUrlMap: Record<string, string> = {
@@ -42,7 +54,19 @@ export default async function PassationTokenPage({ params }: Props) {
   }
 
   const testBaseUrl = moduleUrlMap[moduleName] || moduleUrlMap.CMP
-  const launchUrl = `${testBaseUrl}?token=${encodeURIComponent(token)}&module=${encodeURIComponent(moduleName)}`
+
+  const query = new URLSearchParams({
+    token,
+    module: moduleName,
+    playerId: passation.player_id || '',
+    teamId: passation.team_id || '',
+    clubId: passation.club_id || '',
+    firstname: player?.firstname || player?.first_name || '',
+    lastname: player?.lastname || player?.last_name || '',
+    email: player?.email || ''
+  })
+
+  const launchUrl = `${testBaseUrl}?${query.toString()}`
 
   return (
     <main style={{ maxWidth: 900, margin: '40px auto', padding: 20 }}>
