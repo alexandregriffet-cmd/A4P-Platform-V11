@@ -1,69 +1,81 @@
-:root {
-  --bg: #f4f7fb;
-  --card: #ffffff;
-  --text: #122033;
-  --muted: #5c6878;
-  --primary: #1e3a5f;
-  --primary-2: #2e578d;
-  --border: #dfe7f1;
-  --success: #0f9d58;
-  --warning: #c98c00;
-  --danger: #c0392b;
-  --radius: 18px;
-  --shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
-}
-* { box-sizing: border-box; }
-html, body { padding: 0; margin: 0; }
 body {
-  font-family: Arial, Helvetica, sans-serif;
-  background: var(--bg);
-  color: var(--text);
+  font-family: Arial, sans-serif;
+  margin: 0;
+  background: #f5f7fb;
+  color: #1f2937;
 }
-a { color: var(--primary); text-decoration: none; }
-main.page { max-width: 1180px; margin: 0 auto; padding: 28px 20px 50px; }
-header.topbar {
-  background: linear-gradient(135deg, #18304f 0%, #244873 100%);
+
+.page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.form {
+  display: grid;
+  gap: 12px;
+  max-width: 720px;
+}
+
+input, button, select, textarea {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+}
+
+button {
+  background: #1e3a5f;
   color: white;
-  padding: 14px 20px;
-  box-shadow: var(--shadow);
+  cursor: pointer;
 }
-.topbar-inner { max-width: 1180px; margin: 0 auto; display:flex; align-items:center; justify-content:space-between; gap: 18px; }
-.brand { display:flex; align-items:center; gap:14px; }
-.brand img { width: 62px; height:auto; border-radius: 12px; background:white; padding:6px; }
-.brand-title { font-size: 20px; font-weight: 700; }
-.nav-links { display:flex; gap:16px; flex-wrap:wrap; }
-.nav-links a { color:white; opacity:.92; }
-.hero, .card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); border:1px solid var(--border); }
-.hero { padding: 32px; margin-top: 24px; }
-.grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(240px,1fr)); gap:18px; margin-top: 22px; }
-.card { padding: 22px; }
-.card h3, .card h2 { margin-top: 0; color: var(--primary); }
-.kpis .card p.big { font-size: 34px; font-weight: 700; margin: 8px 0 0; }
-.actions { display:flex; gap:12px; flex-wrap:wrap; margin-top:20px; }
-.btn {
-  display:inline-flex; align-items:center; justify-content:center; gap:8px;
-  background: var(--primary); color:white; border: 1px solid transparent;
-  border-radius: 12px; padding: 12px 18px; font-weight: 700; cursor:pointer;
+
+.grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
-.btn.secondary { background:white; color: var(--primary); border-color: var(--border); }
-.btn.danger { background: var(--danger); }
-.form { display:grid; gap:12px; max-width: 760px; }
-input, select, textarea {
-  width:100%; padding: 12px 14px; border-radius: 12px; border:1px solid #cfd8e4; font-size:15px;
+
+.card {
+  background: white;
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 8px 20px rgba(0,0,0,.05);
 }
-table { width:100%; border-collapse: collapse; background:white; border-radius: 14px; overflow:hidden; }
-th, td { padding: 12px 10px; border-bottom:1px solid #e9eef5; text-align:left; font-size: 14px; }
-th { background:#eef4fb; color: var(--primary); }
-.badge { display:inline-block; padding: 7px 10px; border-radius:999px; font-size:12px; font-weight:700; }
-.badge.success { background:#e7f6ee; color: var(--success); }
-.badge.warning { background:#fff4d6; color: var(--warning); }
-.badge.danger { background:#fdecea; color: var(--danger); }
-.small { color: var(--muted); font-size: 14px; }
-.split { display:grid; grid-template-columns: 1.2fr 1fr; gap:18px; }
-.question-block { background:white; border:1px solid var(--border); border-radius:14px; padding:16px; }
-.likert { display:flex; gap:12px; flex-wrap:wrap; }
-pre.codebox { background:#0f172a; color:#e2e8f0; padding:14px; border-radius:14px; overflow:auto; }
-@media (max-width: 900px) {
-  .split { grid-template-columns: 1fr; }
-  .topbar-inner { flex-direction: column; align-items:flex-start; }
+
+.actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 20px 0;
+}
+
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+th, td {
+  padding: 12px;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+}
+
+.question-block {
+  background: white;
+  padding: 16px;
+  border-radius: 14px;
+}
+
+.likert {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
 }
