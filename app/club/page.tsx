@@ -1,14 +1,31 @@
-export default function ClubPage() {
+import Link from 'next/link'
+
+export default function ClubHome() {
   return (
-    <main className="page">
-      <section className="hero">
-        <h1>Plateforme clubs A4P</h1>
-        <p className="small">Créer des équipes, lancer des passations, suivre les réponses et piloter le dashboard staff.</p>
-        <div className="actions">
-          <a className="btn" href="/club/equipes">Équipes</a>
-          <a className="btn secondary" href="/club/passations">Passations</a>
+    <main style={{ maxWidth: 900, margin: '40px auto', padding: 20 }}>
+      <h1>Portail Club A4P</h1>
+
+      <div style={{ display: 'grid', gap: 20, marginTop: 30 }}>
+
+        <div style={{ padding: 20, border: '1px solid #ddd', borderRadius: 10 }}>
+          <h2>Équipes</h2>
+          <p>Créer et gérer les équipes du club</p>
+          <Link href="/club/equipes">Voir les équipes</Link>
         </div>
-      </section>
+
+        <div style={{ padding: 20, border: '1px solid #ddd', borderRadius: 10 }}>
+          <h2>Joueurs</h2>
+          <p>Créer et gérer les joueurs</p>
+          <Link href="/club/joueurs">Voir les joueurs</Link>
+        </div>
+
+        <div style={{ padding: 20, border: '1px solid #ddd', borderRadius: 10 }}>
+          <h2>Passations</h2>
+          <p>Lancer des tests CMP / PMP / PSYCHO</p>
+          <Link href="/club/passations">Voir les passations</Link>
+        </div>
+
+      </div>
     </main>
   )
 }
