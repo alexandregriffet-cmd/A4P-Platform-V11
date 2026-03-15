@@ -1,34 +1,45 @@
 'use client'
 import { useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabaseClient'
 
 export default function CreateTeamPage() {
-  const [teamName, setTeamName] = useState('')
-  const [sport, setSport] = useState('Rugby')
-  const [category, setCategory] = useState('U18')
-  const [clubId, setClubId] = useState('')
-  const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const [clubId, setClubId] = useState('')
+  const [name, setName] = useState('')
+  const [season, setSeason] = useState('')
+  const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-    const { error } = await supabase.from('teams').insert({ club_id: clubId, team_name: teamName, sport, category })
+    const { data, error } = await supabase
+      .from('teams')
+      .insert({
+        club_id: clubId || null,
+        name,
+        team_name: name,
+        season: season || null
+      })
+      .select()
+      .single()
+
     setLoading(false)
     if (error) return alert(error.message)
-    router.push('/teams')
+    alert('Équipe créée')
+    if (data?.id) {
+      router.push(`/players/create?teamId=${data.id}`)
+    }
   }
 
   return (
-    <main className="page">
+    <main style={{ maxWidth: 760, margin: '40px auto', padding: 20 }}>
       <h1>Créer une équipe</h1>
-      <form onSubmit={handleSubmit} className="form">
-        <input placeholder="ID du club" value={clubId} onChange={(e)=>setClubId(e.target.value)} required />
-        <input placeholder="Nom de l’équipe" value={teamName} onChange={(e)=>setTeamName(e.target.value)} required />
-        <input placeholder="Sport" value={sport} onChange={(e)=>setSport(e.target.value)} required />
-        <input placeholder="Catégorie" value={category} onChange={(e)=>setCategory(e.target.value)} required />
-        <button type="submit" disabled={loading}>{loading ? 'Création...' : 'Créer l’équipe'}</button>
+      <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
+        <input value={clubId} onChange={(e) => setClubId(e.target.value)} placeholder="ID club (optionnel)" />
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom équipe" required />
+        <input value={season} onChange={(e) => setSeason(e.target.value)} placeholder="Saison (ex. 2025-2026)" />
+        <button type="submit" disabled={loading}>{loading ? 'Création…' : 'Créer équipe'}</button>
       </form>
     </main>
   )
