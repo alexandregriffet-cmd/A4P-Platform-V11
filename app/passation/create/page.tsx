@@ -1,23 +1,27 @@
 'use client'
 import { useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 
 function randomToken() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36)
 }
 
 export default function CreatePassationPage() {
-  const params = useSearchParams()
-  const teamIdDefault = params.get('teamId') || ''
   const [clubId, setClubId] = useState('')
-  const [teamId, setTeamId] = useState(teamIdDefault)
+  const [teamId, setTeamId] = useState('')
   const router = useRouter()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const token = randomToken()
-    const { error } = await supabase.from('passations').insert({ club_id: clubId, team_id: teamId, module: 'CMP', token, status: 'active' })
+    const { error } = await supabase.from('passations').insert({
+      club_id: clubId,
+      team_id: teamId,
+      module: 'CMP',
+      token,
+      status: 'active'
+    })
     if (error) return alert(error.message)
     router.push(`/passations/${token}`)
   }
