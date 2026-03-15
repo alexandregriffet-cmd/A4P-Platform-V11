@@ -8,29 +8,29 @@ export default function Page() {
   const launchUrl = `${CMP_URL}?return_url=${encodeURIComponent(returnUrl)}`
 
   const btn: React.CSSProperties = {
-    display: "inline-block",
-    background: "#19386b",
-    color: "#fff",
-    textDecoration: "none",
+    display: 'inline-block',
+    background: '#19386b',
+    color: '#fff',
+    textDecoration: 'none',
     borderRadius: 12,
-    padding: "14px 22px",
-    fontWeight: 700
+    padding: '14px 22px',
+    fontWeight: 700,
   }
 
   const secondary: React.CSSProperties = {
-    display: "inline-block",
-    background: "#fff",
-    color: "#19386b",
-    textDecoration: "none",
+    display: 'inline-block',
+    background: '#fff',
+    color: '#19386b',
+    textDecoration: 'none',
     borderRadius: 12,
-    padding: "14px 22px",
+    padding: '14px 22px',
     fontWeight: 700,
-    border: "1px solid #19386b",
-    marginLeft: 12
+    border: '1px solid #19386b',
+    marginLeft: 12,
   }
 
   return (
-    <main style={{ maxWidth: 980, margin: "40px auto", padding: 20 }}>
+    <main style={{ maxWidth: 980, margin: '40px auto', padding: 20 }}>
       <h1>CMP individuel</h1>
       <p>Ce module utilise ton moteur de test existant.</p>
       <a href={launchUrl} style={btn}>Passer le test</a>
