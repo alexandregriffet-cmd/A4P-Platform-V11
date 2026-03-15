@@ -23,7 +23,7 @@ export default async function PassationTokenPage({ params }: Props) {
 
   if (!passation) {
     return (
-      <main style={{ maxWidth: 760, margin: '40px auto', padding: 20 }}>
+      <main style={{ maxWidth: 900, margin: '40px auto', padding: 20 }}>
         <h1>Passation introuvable</h1>
         <p>Le token n’existe pas ou n’est plus valide.</p>
       </main>
@@ -31,7 +31,6 @@ export default async function PassationTokenPage({ params }: Props) {
   }
 
   const moduleName = passation.module || 'CMP'
-
   const moduleUrlMap: Record<string, string> = {
     CMP: 'https://alexandregriffet-cmd.github.io/CMP-A4P-ACADEMIE-DE-PERFORMANCES-/',
     PMP: 'https://alexandregriffet-cmd.github.io/PMP-A4P-Acad-mie-de-Performances-/',
