@@ -1,26 +1,36 @@
-import CMPForm from '@/components/CMPForm'
 import { createServerSupabase } from '@/lib/supabaseServer'
+import CMPQuestionnaire from '@/components/CMPQuestionnaire'
 
-export default async function PublicPassationPage({ params }: { params: { token: string } }) {
+export default async function PassationTokenPage({
+  params,
+  searchParams
+}: {
+  params: { token: string }
+  searchParams: { play?: string }
+}) {
   const supabase = createServerSupabase()
-  const { data: passation } = await supabase
-    .from('passations')
-    .select('*')
-    .eq('token', params.token)
-    .eq('status', 'active')
-    .single()
+  const { data: passation } = await supabase.from('passations').select('*').eq('token', params.token).single()
 
   if (!passation) {
-    return <main className="page"><div className="card"><h1>Passation introuvable</h1></div></main>
+    return <main className="page"><h1>Passation introuvable</h1></main>
+  }
+
+  const url = `${process.env.NEXT_PUBLIC_APP_URL}/passations/${params.token}?play=1`
+
+  if (searchParams.play === '1') {
+    return (
+      <main className="page">
+        <h1>Passation CMP</h1>
+        <CMPQuestionnaire token={params.token} teamId={passation.team_id} clubId={passation.club_id} />
+      </main>
+    )
   }
 
   return (
     <main className="page">
-      <section className="hero">
-        <h1>Passation CMP joueur</h1>
-        <p className="small">Complète le test. Le résultat sera enregistré et envoyé automatiquement à Alexandre.</p>
-      </section>
-      <CMPForm mode="club" token={params.token} clubId={passation.club_id} teamId={passation.team_id} />
+      <h1>Passation CMP créée</h1>
+      <p>Partage ce lien avec les joueurs :</p>
+      <code>{url}</code>
     </main>
   )
 }
