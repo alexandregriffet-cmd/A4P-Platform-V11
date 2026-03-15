@@ -1,50 +1,29 @@
-'use client'
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabaseClient'
+create extension if not exists pgcrypto;
 
-export default function CreateTeamPage() {
-  const router = useRouter()
-  const [clubId, setClubId] = useState('')
-  const [name, setName] = useState('')
-  const [season, setSeason] = useState('')
-  const [loading, setLoading] = useState(false)
+alter table if exists teams
+  add column if not exists club_id uuid,
+  add column if not exists name text,
+  add column if not exists team_name text,
+  add column if not exists season text,
+  add column if not exists created_at timestamptz default now();
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setLoading(true)
+alter table if exists players
+  add column if not exists team_id uuid,
+  add column if not exists firstname text,
+  add column if not exists lastname text,
+  add column if not exists email text,
+  add column if not exists position text,
+  add column if not exists created_at timestamptz default now();
 
-    const { data, error } = await supabase
-      .from('teams')
-      .insert({
-        club_id: clubId || null,
-        name,
-        team_name: name,
-        season: season || null
-      })
-      .select('id, team_name, season')
-      .single()
+alter table if exists passations
+  add column if not exists player_id uuid,
+  add column if not exists team_id uuid,
+  add column if not exists club_id uuid,
+  add column if not exists module text default 'CMP',
+  add column if not exists token text,
+  add column if not exists status text default 'pending',
+  add column if not exists created_at timestamptz default now();
 
-    setLoading(false)
+create unique index if not exists passations_token_idx on passations(token);
 
-    if (error) {
-      alert(error.message)
-      return
-    }
-
-    alert('Équipe créée')
-    router.push(`/players/create?teamDbId=${data.id}`)
-  }
-
-  return (
-    <main style={{ maxWidth: 760, margin: '40px auto', padding: 20 }}>
-      <h1>Créer une équipe</h1>
-      <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
-        <input value={clubId} onChange={(e) => setClubId(e.target.value)} placeholder="ID club (optionnel)" />
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom équipe" required />
-        <input value={season} onChange={(e) => setSeason(e.target.value)} placeholder="Saison (ex. 2025-2026)" />
-        <button type="submit" disabled={loading}>{loading ? 'Création…' : 'Créer équipe'}</button>
-      </form>
-    </main>
-  )
-}
+notify pgrst, 'reload schema';
