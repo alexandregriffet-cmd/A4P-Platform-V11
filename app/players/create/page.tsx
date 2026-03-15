@@ -1,14 +1,14 @@
 'use client'
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
-import { Suspense } from 'react'
 
 function CreatePlayerInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const teamIdFromUrl = searchParams.get('teamId') || ''
-  const [teamId, setTeamId] = useState(teamIdFromUrl)
+  const teamDbIdFromUrl = searchParams.get('teamDbId') || ''
+
+  const [teamDbId, setTeamDbId] = useState(teamDbIdFromUrl)
   const [firstname, setFirstname] = useState('')
   const [lastname, setLastname] = useState('')
   const [email, setEmail] = useState('')
@@ -18,33 +18,35 @@ function CreatePlayerInner() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
+
     const { data, error } = await supabase
       .from('players')
       .insert({
-        team_id: teamId || null,
+        team_id: teamDbId || null,
         firstname,
         lastname,
-        first_name: firstname,
-        last_name: lastname,
         email: email || null,
         position: position || null
       })
-      .select()
+      .select('id, firstname, lastname')
       .single()
 
     setLoading(false)
-    if (error) return alert(error.message)
-    alert('Joueur créé')
-    if (data?.id) {
-      router.push(`/passations/create?playerId=${data.id}&teamId=${teamId}`)
+
+    if (error) {
+      alert(error.message)
+      return
     }
+
+    alert('Joueur créé')
+    router.push(`/passations/create?playerDbId=${data.id}&teamDbId=${teamDbId}`)
   }
 
   return (
     <main style={{ maxWidth: 760, margin: '40px auto', padding: 20 }}>
       <h1>Créer un joueur</h1>
       <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
-        <input value={teamId} onChange={(e) => setTeamId(e.target.value)} placeholder="ID équipe" required />
+        <input value={teamDbId} onChange={(e) => setTeamDbId(e.target.value)} placeholder="ID équipe (base)" required />
         <input value={firstname} onChange={(e) => setFirstname(e.target.value)} placeholder="Prénom" required />
         <input value={lastname} onChange={(e) => setLastname(e.target.value)} placeholder="Nom" required />
         <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" />
