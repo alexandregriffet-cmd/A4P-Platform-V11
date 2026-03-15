@@ -13,6 +13,7 @@ export default function CreateTeamPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
+
     const { data, error } = await supabase
       .from('teams')
       .insert({
@@ -21,15 +22,18 @@ export default function CreateTeamPage() {
         team_name: name,
         season: season || null
       })
-      .select()
+      .select('id, team_name, season')
       .single()
 
     setLoading(false)
-    if (error) return alert(error.message)
-    alert('Équipe créée')
-    if (data?.id) {
-      router.push(`/players/create?teamId=${data.id}`)
+
+    if (error) {
+      alert(error.message)
+      return
     }
+
+    alert('Équipe créée')
+    router.push(`/players/create?teamDbId=${data.id}`)
   }
 
   return (
