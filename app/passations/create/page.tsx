@@ -1,8 +1,7 @@
 'use client'
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
-import { Suspense } from 'react'
 
 function makeToken() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36)
@@ -11,8 +10,9 @@ function makeToken() {
 function CreatePassationInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [playerId, setPlayerId] = useState(searchParams.get('playerId') || '')
-  const [teamId, setTeamId] = useState(searchParams.get('teamId') || '')
+
+  const [playerDbId, setPlayerDbId] = useState(searchParams.get('playerDbId') || '')
+  const [teamDbId, setTeamDbId] = useState(searchParams.get('teamDbId') || '')
   const [clubId, setClubId] = useState(searchParams.get('clubId') || '')
   const [moduleName, setModuleName] = useState('CMP')
   const [loading, setLoading] = useState(false)
@@ -20,12 +20,14 @@ function CreatePassationInner() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
+
     const token = makeToken()
+
     const { error } = await supabase
       .from('passations')
       .insert({
-        player_id: playerId || null,
-        team_id: teamId || null,
+        player_id: playerDbId || null,
+        team_id: teamDbId || null,
         club_id: clubId || null,
         module: moduleName,
         token,
@@ -33,7 +35,12 @@ function CreatePassationInner() {
       })
 
     setLoading(false)
-    if (error) return alert(error.message)
+
+    if (error) {
+      alert(error.message)
+      return
+    }
+
     router.push(`/passations/${token}`)
   }
 
@@ -41,8 +48,8 @@ function CreatePassationInner() {
     <main style={{ maxWidth: 760, margin: '40px auto', padding: 20 }}>
       <h1>Créer une passation</h1>
       <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
-        <input value={playerId} onChange={(e) => setPlayerId(e.target.value)} placeholder="ID joueur" />
-        <input value={teamId} onChange={(e) => setTeamId(e.target.value)} placeholder="ID équipe" />
+        <input value={playerDbId} onChange={(e) => setPlayerDbId(e.target.value)} placeholder="ID joueur (base)" />
+        <input value={teamDbId} onChange={(e) => setTeamDbId(e.target.value)} placeholder="ID équipe (base)" />
         <input value={clubId} onChange={(e) => setClubId(e.target.value)} placeholder="ID club" />
         <select value={moduleName} onChange={(e) => setModuleName(e.target.value)}>
           <option value="CMP">CMP</option>
