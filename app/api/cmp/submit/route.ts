@@ -1,132 +1,84 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createServerSupabase } from '@/lib/supabaseServer'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
-type Answers = Record<string, number>
-
-function normalizeScore(values: number[]) {
-  if (!values.length) return 0
-  const avg = values.reduce((a, b) => a + b, 0) / values.length
-  return Math.round(((avg - 1) / 4) * 100)
+const DIMENSIONS = {
+  confiance: ['q1', 'q2', 'q3', 'q4'],
+  regulation: ['q5', 'q6', 'q7', 'q8'],
+  engagement: ['q9', 'q10', 'q11', 'q12'],
+  stabilite: ['q13', 'q14', 'q15', 'q16']
 }
 
-function computeCMP(answers: Answers) {
-  const confidenceKeys = ['q1', 'q2', 'q3', 'q4']
-  const regulationKeys = ['q5', 'q6', 'q7', 'q8']
-  const engagementKeys = ['q9', 'q10', 'q11', 'q12']
-  const stabilityKeys = ['q13', 'q14', 'q15', 'q16']
+function average(values: number[]) {
+  return Math.round(values.reduce((a, b) => a + b, 0) / values.length)
+}
 
-  const confiance = normalizeScore(confidenceKeys.map((k) => Number(answers[k] ?? 0)))
-  const regulation = normalizeScore(regulationKeys.map((k) => Number(answers[k] ?? 0)))
-  const engagement = normalizeScore(engagementKeys.map((k) => Number(answers[k] ?? 0)))
-  const stabilite = normalizeScore(stabilityKeys.map((k) => Number(answers[k] ?? 0)))
+function normalizeLikert(v: number) {
+  return Math.round(((v - 1) / 4) * 100)
+}
 
-  const score_global = Math.round((confiance + regulation + engagement + stabilite) / 4)
+function computeScores(answers: Record<string, number>) {
+  const dimensions = Object.fromEntries(
+    Object.entries(DIMENSIONS).map(([key, ids]) => {
+      const values = ids.map((id) => normalizeLikert(Number(answers[id] || 1)))
+      return [key, average(values)]
+    })
+  ) as Record<string, number>
 
-  let profile_code = 'CMP-4'
-  let profile_name = 'Fonctionnement mental intermédiaire'
-  let summary =
-    'Le profil présente un socle mental exploitable avec des axes de progression identifiables.'
+  const score_global = average(Object.values(dimensions))
+  return { dimensions, score_global }
+}
 
-  if (engagement >= 70 && regulation < 60) {
-    profile_code = 'CMP-2'
-    profile_name = 'Mobilisation forte mais régulation fluctuante'
-    summary =
-      "L’énergie mentale est présente et l’engagement est fort, mais certaines situations de pression provoquent des fluctuations émotionnelles qui perturbent la stabilité."
-  } else if (score_global >= 75) {
-    profile_code = 'CMP-1'
-    profile_name = 'Compétences mentales solides'
-    summary =
-      "Le profil présente une base mentale robuste, mobilisable dans l’action et globalement stable sous pression."
-  } else if (confiance < 55) {
-    profile_code = 'CMP-3'
-    profile_name = 'Engagement présent mais confiance fragile'
-    summary =
-      "Le sujet s’implique, mais le doute et la vulnérabilité de confiance limitent parfois l’expression du potentiel."
+function chooseProfile(dimensions: Record<string, number>, global: number) {
+  if (global >= 70 && dimensions.confiance >= 65 && dimensions.regulation >= 65 && dimensions.engagement >= 65 && dimensions.stabilite >= 65) {
+    return { code: 'CMP-1', name: 'Socle mental solide et mobilisable' }
   }
-
-  return {
-    score_global,
-    dimensions: {
-      confiance,
-      regulation,
-      engagement,
-      stabilite
-    },
-    profile_code,
-    profile_name,
-    summary
+  if (dimensions.engagement >= 70 && dimensions.regulation < 60) {
+    return { code: 'CMP-2', name: 'Mobilisation forte mais régulation fluctuante' }
   }
+  if (dimensions.engagement >= 60 && dimensions.confiance < 60) {
+    return { code: 'CMP-3', name: 'Potentiel engagé mais confiance fragile' }
+  }
+  if (global < 50 || (dimensions.confiance < 50 && dimensions.regulation < 50)) {
+    return { code: 'CMP-5', name: 'Base mentale en construction' }
+  }
+  return { code: 'CMP-4', name: 'Fonctionnement mental irrégulier' }
 }
 
 export async function POST(req: Request) {
   try {
+    const supabase = createServerSupabase()
     const body = await req.json()
+    const { token, teamId, clubId, firstname, lastname, answers } = body
 
-    const mode = String(body.mode ?? 'individual')
-    const token = body.token ? String(body.token) : null
-    const clubId = body.clubId ? String(body.clubId) : null
-    const teamId = body.teamId ? String(body.teamId) : null
-    const firstname = String(body.firstname ?? '').trim()
-    const lastname = String(body.lastname ?? '').trim()
-    const email = String(body.email ?? '').trim()
-    const answers = (body.answers ?? {}) as Answers
-
-    if (!firstname || !lastname || !Object.keys(answers).length) {
-      return NextResponse.json(
-        { ok: false, error: 'Données incomplètes.' },
-        { status: 400 }
-      )
+    if (!token || !teamId || !clubId || !firstname || !lastname || !answers) {
+      return NextResponse.json({ error: 'Données manquantes' }, { status: 400 })
     }
 
-    const result = computeCMP(answers)
+    const { data: passation } = await supabase.from('passations').select('*').eq('token', token).eq('status', 'active').single()
+    if (!passation) {
+      return NextResponse.json({ error: 'Passation invalide' }, { status: 404 })
+    }
 
-    const payload = {
-      source: mode === 'club' ? 'club' : 'individual',
-      module: 'CMP',
+    const { dimensions, score_global } = computeScores(answers)
+    const profile = chooseProfile(dimensions, score_global)
+
+    const { error } = await supabase.from('tests').insert({
       club_id: clubId,
       team_id: teamId,
-      passation_id: token,
+      passation_id: passation.passation_id,
+      module: 'CMP',
+      score_global,
+      dimensions,
+      profile_code: profile.code,
+      profile_name: profile.name,
       player_firstname: firstname,
-      player_lastname: lastname,
-      player_email: email || null,
-      score_global: result.score_global,
-      dimensions: result.dimensions,
-      profile_code: result.profile_code,
-      profile_name: result.profile_name,
-      summary: result.summary,
-      raw_answers: answers
-    }
-
-    const { error } = await supabase.from('tests').insert(payload)
-
-    if (error) {
-      return NextResponse.json(
-        { ok: false, error: error.message, debug: payload },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json({
-      ok: true,
-      score_global: result.score_global,
-      profile_name: result.profile_name,
-      profile_code: result.profile_code,
-      summary: result.summary,
-      dimensions: result.dimensions,
-      result
+      player_lastname: lastname
     })
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Erreur serveur inconnue'
 
-    return NextResponse.json(
-      { ok: false, error: message },
-      { status: 500 }
-    )
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    return NextResponse.json({ ok: true, score_global, dimensions, profile_code: profile.code, profile_name: profile.name })
+  } catch {
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
   }
 }
