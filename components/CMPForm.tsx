@@ -23,15 +23,15 @@ export default function CMPForm() {
         confiance: Number(formData.get('confiance') || 0),
         focus: Number(formData.get('focus') || 0),
         motivation: Number(formData.get('motivation') || 0),
-        regulation: Number(formData.get('regulation') || 0),
-      },
+        regulation: Number(formData.get('regulation') || 0)
+      }
     }
 
     try {
       const res = await fetch('/api/results/ingest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(payload)
       })
 
       if (!res.ok) throw new Error('submit_failed')
