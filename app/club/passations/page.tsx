@@ -1,32 +1,15 @@
-import { createServerSupabase } from '@/lib/supabaseServer'
+import { HUB_URL } from '@/lib/constants'
 
-export default async function PassationsPage() {
-  const supabase = createServerSupabase()
-  const { data } = await supabase.from('passations').select('*').order('created_at', { ascending: false })
-
+export default function Page() {
   return (
-    <main className="page">
-      <section className="hero">
-        <h1>Passations club</h1>
-        <div className="actions">
-          <a className="btn" href="/club/passations/create">Créer une passation</a>
-        </div>
-      </section>
-      <div className="card">
-        <table>
-          <thead><tr><th>Module</th><th>Équipe</th><th>Statut</th><th>Lien</th></tr></thead>
-          <tbody>
-            {(data || []).map((p) => (
-              <tr key={p.passation_id}>
-                <td>{p.module}</td>
-                <td>{p.team_id}</td>
-                <td>{p.status}</td>
-                <td><a href={`/club/passations/create?preview=${p.token}`}>Voir</a></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+    <main style={ maxWidth: 980, margin: "40px auto", padding: 20 }>
+      <h1>Passations club</h1>
+      <p>Route active pour la création de passations.</p>
+      <p style={ marginTop: 24 }>
+        <a href="/club/dashboard">← Retour</a>
+        <span style={ margin: "0 12px" }></span>
+        <a href={HUB_URL}>Retour hub diagnostique</a>
+      </p>
     </main>
   )
 }
