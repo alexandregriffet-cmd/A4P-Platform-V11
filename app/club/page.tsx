@@ -5,9 +5,23 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 
+type ProfileRow = {
+  id?: string | null
+  user_id?: string | null
+  role?: string | null
+  club_id?: string | null
+  player_id?: string | null
+  firstname?: string | null
+  lastname?: string | null
+  full_name?: string | null
+  email?: string | null
+  status?: string | null
+}
+
 type ClubRow = {
   id: string
   name?: string | null
+  club_name?: string | null
   created_at?: string | null
 }
 
@@ -20,63 +34,47 @@ type TeamRow = {
   created_at?: string | null
 }
 
-type ImportedPlayer = {
-  raw: string
-  firstname: string
-  lastname: string
-  email: string | null
+type PlayerRow = {
+  id: string
+  firstname?: string | null
+  lastname?: string | null
+  email?: string | null
+  team_id?: string | null
+  created_at?: string | null
 }
 
-type CreatedPassation = {
-  playerId: string
-  firstname: string
-  lastname: string
-  email: string | null
-  token: string
-  link: string
+type PassationRow = {
+  id?: string | null
+  token?: string | null
+  module?: string | null
+  status?: string | null
+  player_id?: string | null
+  team_id?: string | null
+  club_id?: string | null
+  created_at?: string | null
 }
 
-function makeToken(length = 20): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
-  let token = ''
-  for (let i = 0; i < length; i += 1) {
-    token += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return token
+type CmpResultRow = {
+  token?: string | null
+  firstname?: string | null
+  lastname?: string | null
+  email?: string | null
+  profile_code?: string | null
+  profile_label?: string | null
+  score_global?: number | null
+  created_at?: string | null
 }
 
-function parsePlayerLine(line: string): ImportedPlayer | null {
-  const cleaned = line.trim()
-  if (!cleaned) return null
-
-  let identityPart = cleaned
-  let emailPart = ''
-
-  if (cleaned.includes(';')) {
-    const parts = cleaned.split(';')
-    identityPart = (parts[0] || '').trim()
-    emailPart = (parts[1] || '').trim()
-  } else {
-    const lastComma = cleaned.lastIndexOf(',')
-    if (lastComma > -1) {
-      identityPart = cleaned.slice(0, lastComma).trim()
-      emailPart = cleaned.slice(lastComma + 1).trim()
-    }
-  }
-
-  const identityTokens = identityPart
-    .split(/\s+/)
-    .map((p) => p.trim())
-    .filter(Boolean)
-
-  if (!identityTokens.length) return null
-
-  return {
-    raw: cleaned,
-    firstname: identityTokens[0] || '',
-    lastname: identityTokens.slice(1).join(' ') || '',
-    email: emailPart || null
-  }
+type PortalState = {
+  loading: boolean
+  error: string
+  userEmail: string
+  profile: ProfileRow | null
+  club: ClubRow | null
+  teams: TeamRow[]
+  players: PlayerRow[]
+  passations: PassationRow[]
+  cmpResults: CmpResultRow[]
 }
 
 function formatDate(value?: string | null) {
@@ -90,629 +88,518 @@ function formatDate(value?: string | null) {
   }).format(date)
 }
 
-function clubLabel(club: ClubRow) {
-  return club.name || 'Club sans nom'
+function getClubLabel(club?: ClubRow | null) {
+  if (!club) return 'Club'
+  return club.name || club.club_name || 'Club sans nom'
 }
 
-function teamLabel(team: TeamRow) {
+function getTeamLabel(team?: TeamRow | null) {
+  if (!team) return 'Équipe'
   return team.team_name || team.name || 'Équipe sans nom'
 }
 
-export default function AdminClubsPage() {
-  const [loading, setLoading] = useState(false)
-  const [loadingData, setLoadingData] = useState(true)
+function getPlayerFullName(player?: {
+  firstname?: string | null
+  lastname?: string | null
+}) {
+  if (!player) return 'Sportif'
+  const fullName = [player.firstname || '', player.lastname || '']
+    .filter(Boolean)
+    .join(' ')
+    .trim()
 
-  const [message, setMessage] = useState('')
-  const [errorMessage, setErrorMessage] = useState('')
+  return fullName || 'Sportif sans nom'
+}
 
-  const [clubs, setClubs] = useState<ClubRow[]>([])
-  const [teams, setTeams] = useState<TeamRow[]>([])
+function getStatusLabel(status?: string | null) {
+  if (status === 'completed') return 'Terminée'
+  if (status === 'in_progress') return 'En cours'
+  if (status === 'sent') return 'Envoyée'
+  if (status === 'pending') return 'À faire'
+  return status || 'Inconnu'
+}
 
-  const [clubMode, setClubMode] = useState<'existing' | 'new'>('new')
-  const [selectedClubId, setSelectedClubId] = useState('')
-  const [newClubName, setNewClubName] = useState('')
+function getStatusStyle(status?: string | null): CSSProperties {
+  if (status === 'completed') {
+    return {
+      background: '#ecfdf3',
+      color: '#067647',
+      border: '1px solid #abefc6'
+    }
+  }
 
-  const [teamMode, setTeamMode] = useState<'existing' | 'new'>('new')
-  const [selectedTeamId, setSelectedTeamId] = useState('')
-  const [newTeamName, setNewTeamName] = useState('')
-  const [season, setSeason] = useState('')
+  if (status === 'in_progress') {
+    return {
+      background: '#eff8ff',
+      color: '#175cd3',
+      border: '1px solid #b2ddff'
+    }
+  }
 
-  const [moduleName, setModuleName] = useState('CMP')
-  const [playersText, setPlayersText] = useState('')
+  if (status === 'sent') {
+    return {
+      background: '#eef4ff',
+      color: '#34518b',
+      border: '1px solid #c7d7fe'
+    }
+  }
 
-  const [createdClubId, setCreatedClubId] = useState('')
-  const [createdTeamId, setCreatedTeamId] = useState('')
-  const [createdLinks, setCreatedLinks] = useState<CreatedPassation[]>([])
+  return {
+    background: '#f8fafd',
+    color: '#667085',
+    border: '1px solid #d5ddea'
+  }
+}
 
-  const parsedPlayers = useMemo(() => {
-    return playersText
-      .split('\n')
-      .map(parsePlayerLine)
-      .filter((p): p is ImportedPlayer => Boolean(p))
-  }, [playersText])
+function scoreAverage(values: Array<number | null | undefined>) {
+  const numeric = values.filter((value): value is number => typeof value === 'number')
+  if (!numeric.length) return '—'
+  return Math.round(numeric.reduce((sum, value) => sum + value, 0) / numeric.length)
+}
 
-  const filteredTeams = useMemo(() => {
-    const activeClubId =
-      clubMode === 'existing' ? selectedClubId : createdClubId || selectedClubId
+function StatCard({
+  value,
+  label,
+  helper
+}: {
+  value: string | number
+  label: string
+  helper?: string
+}) {
+  return (
+    <div style={statCardStyle}>
+      <div style={statValueStyle}>{value}</div>
+      <div style={statLabelStyle}>{label}</div>
+      {helper ? <div style={statHelperStyle}>{helper}</div> : null}
+    </div>
+  )
+}
 
-    if (!activeClubId) return teams
-
-    return teams.filter((team) => team.club_id === activeClubId)
-  }, [teams, clubMode, selectedClubId, createdClubId])
+export default function ClubPortalPage() {
+  const [state, setState] = useState<PortalState>({
+    loading: true,
+    error: '',
+    userEmail: '',
+    profile: null,
+    club: null,
+    teams: [],
+    players: [],
+    passations: [],
+    cmpResults: []
+  })
 
   useEffect(() => {
-    void loadData()
+    let cancelled = false
+
+    async function load() {
+      try {
+        setState((prev) => ({ ...prev, loading: true, error: '' }))
+
+        const {
+          data: { user },
+          error: userError
+        } = await supabase.auth.getUser()
+
+        if (userError) {
+          throw new Error(userError.message)
+        }
+
+        if (!user) {
+          throw new Error('Aucun utilisateur connecté. Connecte-toi pour accéder au portail club.')
+        }
+
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select(
+            'id, user_id, role, club_id, player_id, firstname, lastname, full_name, email, status'
+          )
+          .eq('user_id', user.id)
+          .single<ProfileRow>()
+
+        if (profileError || !profile) {
+          throw new Error(
+            "Profil introuvable. Ton utilisateur n'est pas encore rattaché à la table profiles."
+          )
+        }
+
+        if (!profile.club_id && profile.role !== 'admin') {
+          throw new Error(
+            "Ce compte n'est rattaché à aucun club. Renseigne club_id dans profiles pour ouvrir le portail club."
+          )
+        }
+
+        const clubId = profile.club_id || ''
+
+        let club: ClubRow | null = null
+        let teams: TeamRow[] = []
+        let players: PlayerRow[] = []
+        let passations: PassationRow[] = []
+        let cmpResults: CmpResultRow[] = []
+
+        if (clubId) {
+          const [
+            clubResponse,
+            teamsResponse,
+            passationsResponse
+          ] = await Promise.all([
+            supabase
+              .from('clubs')
+              .select('id, name, club_name, created_at')
+              .eq('id', clubId)
+              .single<ClubRow>(),
+            supabase
+              .from('teams')
+              .select('id, name, team_name, season, club_id, created_at')
+              .eq('club_id', clubId)
+              .order('created_at', { ascending: false })
+              .returns<TeamRow[]>(),
+            supabase
+              .from('passations')
+              .select('id, token, module, status, player_id, team_id, club_id, created_at')
+              .eq('club_id', clubId)
+              .order('created_at', { ascending: false })
+              .returns<PassationRow[]>()
+          ])
+
+          if (clubResponse.error) {
+            throw new Error(clubResponse.error.message)
+          }
+
+          club = clubResponse.data ?? null
+          teams = teamsResponse.data ?? []
+          passations = passationsResponse.data ?? []
+
+          const teamIds = teams.map((team) => team.id)
+          if (teamIds.length > 0) {
+            const { data: playersData, error: playersError } = await supabase
+              .from('players')
+              .select('id, firstname, lastname, email, team_id, created_at')
+              .in('team_id', teamIds)
+              .order('created_at', { ascending: false })
+              .returns<PlayerRow[]>()
+
+            if (playersError) {
+              throw new Error(playersError.message)
+            }
+
+            players = playersData ?? []
+          }
+
+          const passationTokens = passations
+            .map((item) => item.token)
+            .filter((token): token is string => Boolean(token))
+
+          if (passationTokens.length > 0) {
+            const { data: cmpData, error: cmpError } = await supabase
+              .from('cmp_results')
+              .select(
+                'token, firstname, lastname, email, profile_code, profile_label, score_global, created_at'
+              )
+              .in('token', passationTokens)
+              .order('created_at', { ascending: false })
+              .returns<CmpResultRow[]>()
+
+            if (cmpError) {
+              throw new Error(cmpError.message)
+            }
+
+            cmpResults = cmpData ?? []
+          }
+        }
+
+        if (!cancelled) {
+          setState({
+            loading: false,
+            error: '',
+            userEmail: user.email || profile.email || '',
+            profile,
+            club,
+            teams,
+            players,
+            passations,
+            cmpResults
+          })
+        }
+      } catch (error: any) {
+        if (!cancelled) {
+          setState((prev) => ({
+            ...prev,
+            loading: false,
+            error: error?.message || 'Erreur inconnue dans le portail club.'
+          }))
+        }
+      }
+    }
+
+    load()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
-  async function loadData() {
-    setLoadingData(true)
-    setErrorMessage('')
+  const teamsById = useMemo(() => {
+    const map = new Map<string, TeamRow>()
+    state.teams.forEach((team) => map.set(team.id, team))
+    return map
+  }, [state.teams])
 
-    try {
-      const [{ data: clubsData, error: clubsError }, { data: teamsData, error: teamsError }] =
-        await Promise.all([
-          supabase
-            .from('clubs')
-            .select('id, name, created_at')
-            .order('created_at', { ascending: false }),
-          supabase
-            .from('teams')
-            .select('id, name, team_name, season, club_id, created_at')
-            .order('created_at', { ascending: false })
-        ])
+  const playersById = useMemo(() => {
+    const map = new Map<string, PlayerRow>()
+    state.players.forEach((player) => map.set(player.id, player))
+    return map
+  }, [state.players])
 
-      if (clubsError) throw new Error(clubsError.message)
-      if (teamsError) throw new Error(teamsError.message)
-
-      setClubs((clubsData as ClubRow[]) || [])
-      setTeams((teamsData as TeamRow[]) || [])
-    } catch (error: any) {
-      setErrorMessage(error?.message || 'Impossible de charger les clubs et équipes.')
-    } finally {
-      setLoadingData(false)
-    }
-  }
-
-  async function ensureClub(): Promise<string> {
-    if (clubMode === 'existing') {
-      if (!selectedClubId) {
-        throw new Error('Sélectionne un club existant.')
-      }
-      return selectedClubId
-    }
-
-    if (!newClubName.trim()) {
-      throw new Error('Le nom du club est obligatoire.')
-    }
-
-    const payload = {
-      name: newClubName.trim()
-    }
-
-    const { data, error } = await supabase
-      .from('clubs')
-      .insert(payload)
-      .select('id, name, created_at')
-      .single()
-
-    if (error || !data?.id) {
-      throw new Error(error?.message || 'Impossible de créer le club.')
-    }
-
-    const club = data as ClubRow
-    setClubs((prev) => [club, ...prev])
-    setCreatedClubId(club.id)
-    setSelectedClubId(club.id)
-
-    return club.id
-  }
-
-  async function ensureTeam(clubId: string): Promise<string> {
-    if (teamMode === 'existing') {
-      if (!selectedTeamId) {
-        throw new Error('Sélectionne une équipe existante.')
-      }
-      return selectedTeamId
-    }
-
-    if (!newTeamName.trim()) {
-      throw new Error("Le nom de l'équipe est obligatoire.")
-    }
-
-    const payload = {
-      club_id: clubId,
-      name: newTeamName.trim(),
-      team_name: newTeamName.trim(),
-      season: season.trim() || null
-    }
-
-    const { data, error } = await supabase
-      .from('teams')
-      .insert(payload)
-      .select('id, name, team_name, season, club_id, created_at')
-      .single()
-
-    if (error || !data?.id) {
-      throw new Error(error?.message || "Impossible de créer l'équipe.")
-    }
-
-    const team = data as TeamRow
-    setTeams((prev) => [team, ...prev])
-    setCreatedTeamId(team.id)
-    setSelectedTeamId(team.id)
-
-    return team.id
-  }
-
-  async function createPlayersAndPassations(teamId: string, clubId: string) {
-    if (!parsedPlayers.length) {
-      throw new Error('Ajoute au moins un joueur.')
-    }
-
-    const playersPayload = parsedPlayers.map((player) => ({
-      team_id: teamId,
-      firstname: player.firstname,
-      lastname: player.lastname,
-      email: player.email,
-      position: null
-    }))
-
-    const { data: playersCreated, error: playersError } = await supabase
-      .from('players')
-      .insert(playersPayload)
-      .select('id, firstname, lastname, email')
-
-    if (playersError || !playersCreated) {
-      throw new Error(playersError?.message || 'Impossible de créer les joueurs.')
-    }
-
-    const passationsPayload = playersCreated.map((player) => ({
-      player_id: player.id,
-      team_id: teamId,
-      club_id: clubId,
-      module: moduleName,
-      token: makeToken(),
-      status: 'pending'
-    }))
-
-    const { data: passationsCreated, error: passationsError } = await supabase
-      .from('passations')
-      .insert(passationsPayload)
-      .select('player_id, token, module, status')
-
-    if (passationsError || !passationsCreated) {
-      throw new Error(passationsError?.message || 'Impossible de créer les passations.')
-    }
-
-    const links: CreatedPassation[] = playersCreated.map((player) => {
-      const passation = passationsCreated.find((p) => p.player_id === player.id)
-      const token = passation?.token || ''
-
-      return {
-        playerId: player.id,
-        firstname: player.firstname || '',
-        lastname: player.lastname || '',
-        email: player.email || null,
-        token,
-        link: `${window.location.origin}/passations/${token}`
+  const cmpByToken = useMemo(() => {
+    const map = new Map<string, CmpResultRow>()
+    state.cmpResults.forEach((item) => {
+      if (item.token && !map.has(item.token)) {
+        map.set(item.token, item)
       }
     })
+    return map
+  }, [state.cmpResults])
 
-    setCreatedLinks(links)
+  const totalTeams = state.teams.length
+  const totalPlayers = state.players.length
+  const totalPassations = state.passations.length
+  const totalCmpResults = state.cmpResults.length
 
-    return {
-      playersCount: playersCreated.length,
-      passationsCount: passationsCreated.length
-    }
+  const completedCount = state.passations.filter((item) => item.status === 'completed').length
+  const pendingCount = state.passations.filter((item) => item.status === 'pending').length
+  const inProgressCount = state.passations.filter((item) => item.status === 'in_progress').length
+  const sentCount = state.passations.filter((item) => item.status === 'sent').length
+
+  const averageCmpScore = scoreAverage(state.cmpResults.map((item) => item.score_global))
+  const lastResultDate =
+    state.cmpResults.length > 0 ? formatDate(state.cmpResults[0]?.created_at) : '—'
+
+  if (state.loading) {
+    return (
+      <main style={pageStyle}>
+        <section style={heroStyle}>
+          <div style={eyebrowStyle}>Portail club sécurisé</div>
+          <h1 style={heroTitleStyle}>Chargement du portail club…</h1>
+          <p style={heroTextStyle}>Lecture des données sécurisées du club en cours.</p>
+        </section>
+      </main>
+    )
   }
 
-  async function handleGenerate(e: React.FormEvent) {
-    e.preventDefault()
+  if (state.error) {
+    return (
+      <main style={pageStyle}>
+        <section style={heroStyle}>
+          <div style={eyebrowStyle}>Portail club sécurisé</div>
+          <h1 style={heroTitleStyle}>Accès club indisponible</h1>
+          <p style={heroTextStyle}>{state.error}</p>
 
-    setLoading(true)
-    setMessage('')
-    setErrorMessage('')
-    setCreatedLinks([])
-    setCreatedClubId('')
-    setCreatedTeamId('')
-
-    try {
-      const clubId = await ensureClub()
-      const teamId = await ensureTeam(clubId)
-      const result = await createPlayersAndPassations(teamId, clubId)
-
-      setMessage(
-        `Opération terminée : ${result.playersCount} joueur(s) créé(s), ${result.passationsCount} passation(s) générée(s).`
-      )
-
-      await loadData()
-    } catch (error: any) {
-      setErrorMessage(error?.message || 'Erreur inconnue.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function copyAllLinks() {
-    if (!createdLinks.length) return
-
-    const text = createdLinks
-      .map((item, index) => {
-        const name =
-          [item.firstname, item.lastname].filter(Boolean).join(' ') || `Joueur ${index + 1}`
-        const email = item.email ? ` (${item.email})` : ''
-        return `${name}${email}\n${item.link}`
-      })
-      .join('\n\n')
-
-    await navigator.clipboard.writeText(text)
-    setMessage('Tous les liens ont été copiés.')
-  }
-
-  async function copyOneLink(link: string) {
-    await navigator.clipboard.writeText(link)
-    setMessage('Lien copié.')
-  }
-
-  function resetForm() {
-    setMessage('')
-    setErrorMessage('')
-    setClubMode('new')
-    setSelectedClubId('')
-    setNewClubName('')
-    setTeamMode('new')
-    setSelectedTeamId('')
-    setNewTeamName('')
-    setSeason('')
-    setModuleName('CMP')
-    setPlayersText('')
-    setCreatedClubId('')
-    setCreatedTeamId('')
-    setCreatedLinks([])
+          <div style={heroActionsStyle}>
+            <Link href="/admin" style={secondaryButtonStyle}>
+              Retour admin
+            </Link>
+          </div>
+        </section>
+      </main>
+    )
   }
 
   return (
     <main style={pageStyle}>
-      <div style={headerWrap}>
-        <div>
-          <div style={eyebrowStyle}>Cockpit admin A4P</div>
-          <h1 style={titleStyle}>Gestion des clubs</h1>
-          <p style={introStyle}>
-            Cette page permet de créer un club, créer une équipe, importer des joueurs
-            et générer immédiatement leurs passations sécurisées.
+      <section style={heroStyle}>
+        <div style={heroTopStyle}>
+          <div>
+            <div style={eyebrowStyle}>Portail club sécurisé</div>
+            <h1 style={heroTitleStyle}>{getClubLabel(state.club)}</h1>
+            <p style={heroTextStyle}>
+              Ce portail affiche uniquement les données du club rattaché au compte connecté :
+              équipes, joueurs, passations, progression et réponses CMP.
+            </p>
+
+            <div style={pillRowStyle}>
+              <span style={pillStyle}>Compte : {state.userEmail || '—'}</span>
+              <span style={pillStyle}>Rôle : {state.profile?.role || '—'}</span>
+              <span style={pillStyle}>Club ID : {state.profile?.club_id || '—'}</span>
+            </div>
+          </div>
+
+          <div style={heroActionsStyle}>
+            <Link href="/club/import-equipe" style={primaryButtonStyle}>
+              Import équipe
+            </Link>
+            <Link href="/admin/passations" style={secondaryButtonStyle}>
+              Cockpit passations
+            </Link>
+            <Link href="/admin/resultats" style={secondaryButtonStyle}>
+              Cockpit résultats
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section style={gridStatsStyle}>
+        <StatCard value={totalTeams} label="équipes" helper="équipes du club" />
+        <StatCard value={totalPlayers} label="joueurs" helper="sportifs rattachés" />
+        <StatCard value={totalPassations} label="passations" helper="liens du club" />
+        <StatCard value={totalCmpResults} label="réponses CMP" helper="résultats du club" />
+      </section>
+
+      <section style={gridStatsStyle}>
+        <StatCard value={completedCount} label="terminées" helper="tests complétés" />
+        <StatCard value={pendingCount} label="à faire" helper="liens non utilisés" />
+        <StatCard value={inProgressCount} label="en cours" helper="questionnaires entamés" />
+        <StatCard value={sentCount} label="envoyées" helper="passations transmises" />
+        <StatCard value={averageCmpScore} label="score moyen CMP" helper="moyenne club" />
+        <StatCard value={lastResultDate} label="dernier résultat" helper="réponse récente" />
+      </section>
+
+      <section style={panelStyle}>
+        <div style={panelHeaderStyle}>
+          <h2 style={panelTitleStyle}>Équipes du club</h2>
+          <p style={panelTextStyle}>
+            Chaque carte donne accès au dashboard équipe déjà construit dans V11.
           </p>
         </div>
 
-        <div style={headerButtonsStyle}>
-          <Link href="/admin/passations" style={secondaryLinkStyle}>
-            Passations
-          </Link>
-          <Link href="/admin/resultats" style={secondaryLinkStyle}>
-            Résultats
-          </Link>
-        </div>
-      </div>
+        {state.teams.length === 0 ? (
+          <div style={emptyStyle}>Aucune équipe rattachée à ce club pour le moment.</div>
+        ) : (
+          <div style={cardGridStyle}>
+            {state.teams.map((team) => {
+              const teamPlayers = state.players.filter((player) => player.team_id === team.id)
+              const teamPassations = state.passations.filter((item) => item.team_id === team.id)
+              const teamTokens = teamPassations
+                .map((item) => item.token)
+                .filter((token): token is string => Boolean(token))
+              const teamResults = teamTokens
+                .map((token) => cmpByToken.get(token))
+                .filter((item): item is CmpResultRow => Boolean(item))
 
-      <section style={heroCardStyle}>
-        <form onSubmit={handleGenerate} style={{ display: 'grid', gap: 24 }}>
-          <div style={twoColsStyle}>
-            <div style={panelStyle}>
-              <h2 style={sectionTitleStyle}>1. Club</h2>
+              return (
+                <div key={team.id} style={teamCardStyle}>
+                  <div style={teamCardTopStyle}>
+                    <div>
+                      <div style={teamTitleStyle}>{getTeamLabel(team)}</div>
+                      <div style={teamSubStyle}>Saison : {team.season || '—'}</div>
+                    </div>
 
-              <div style={switchRowStyle}>
-                <button
-                  type="button"
-                  onClick={() => setClubMode('new')}
-                  style={clubMode === 'new' ? tabActiveStyle : tabStyle}
-                >
-                  Nouveau club
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setClubMode('existing')}
-                  style={clubMode === 'existing' ? tabActiveStyle : tabStyle}
-                >
-                  Club existant
-                </button>
-              </div>
-
-              {clubMode === 'new' ? (
-                <div style={fieldWrapStyle}>
-                  <label style={labelStyle}>Nom du club</label>
-                  <input
-                    value={newClubName}
-                    onChange={(e) => setNewClubName(e.target.value)}
-                    placeholder="Ex. Rugby Club Asnières"
-                    style={inputStyle}
-                  />
-                </div>
-              ) : (
-                <div style={fieldWrapStyle}>
-                  <label style={labelStyle}>Choisir un club</label>
-                  <select
-                    value={selectedClubId}
-                    onChange={(e) => {
-                      setSelectedClubId(e.target.value)
-                      setSelectedTeamId('')
-                    }}
-                    style={inputStyle}
-                  >
-                    <option value="">Sélectionner</option>
-                    {clubs.map((club) => (
-                      <option key={club.id} value={club.id}>
-                        {clubLabel(club)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-
-            <div style={panelStyle}>
-              <h2 style={sectionTitleStyle}>2. Équipe</h2>
-
-              <div style={switchRowStyle}>
-                <button
-                  type="button"
-                  onClick={() => setTeamMode('new')}
-                  style={teamMode === 'new' ? tabActiveStyle : tabStyle}
-                >
-                  Nouvelle équipe
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setTeamMode('existing')}
-                  style={teamMode === 'existing' ? tabActiveStyle : tabStyle}
-                >
-                  Équipe existante
-                </button>
-              </div>
-
-              {teamMode === 'new' ? (
-                <>
-                  <div style={fieldWrapStyle}>
-                    <label style={labelStyle}>Nom de l’équipe</label>
-                    <input
-                      value={newTeamName}
-                      onChange={(e) => setNewTeamName(e.target.value)}
-                      placeholder="Ex. U17 Rugby"
-                      style={inputStyle}
-                    />
+                    <Link href={`/club/equipe/${team.id}`} style={smallPrimaryButtonStyle}>
+                      Ouvrir
+                    </Link>
                   </div>
 
-                  <div style={fieldWrapStyle}>
-                    <label style={labelStyle}>Saison</label>
-                    <input
-                      value={season}
-                      onChange={(e) => setSeason(e.target.value)}
-                      placeholder="Ex. 2025-2026"
-                      style={inputStyle}
+                  <div style={miniStatsGridStyle}>
+                    <MiniStat label="Joueurs" value={String(teamPlayers.length)} />
+                    <MiniStat label="Passations" value={String(teamPassations.length)} />
+                    <MiniStat label="Réponses" value={String(teamResults.length)} />
+                    <MiniStat
+                      label="Score moyen"
+                      value={String(scoreAverage(teamResults.map((item) => item.score_global)))}
                     />
                   </div>
-                </>
-              ) : (
-                <div style={fieldWrapStyle}>
-                  <label style={labelStyle}>Choisir une équipe</label>
-                  <select
-                    value={selectedTeamId}
-                    onChange={(e) => setSelectedTeamId(e.target.value)}
-                    style={inputStyle}
-                  >
-                    <option value="">Sélectionner</option>
-                    {filteredTeams.map((team) => (
-                      <option key={team.id} value={team.id}>
-                        {teamLabel(team)} {team.season ? `• ${team.season}` : ''}
-                      </option>
-                    ))}
-                  </select>
                 </div>
-              )}
-
-              <div style={fieldWrapStyle}>
-                <label style={labelStyle}>Module</label>
-                <select
-                  value={moduleName}
-                  onChange={(e) => setModuleName(e.target.value)}
-                  style={inputStyle}
-                >
-                  <option value="CMP">CMP</option>
-                  <option value="PMP">PMP</option>
-                  <option value="PSYCHO">PSYCHO</option>
-                </select>
-              </div>
-            </div>
+              )
+            })}
           </div>
-
-          <div style={panelStyle}>
-            <h2 style={sectionTitleStyle}>3. Import des joueurs</h2>
-
-            <div style={fieldWrapStyle}>
-              <label style={labelStyle}>Liste des joueurs</label>
-              <textarea
-                value={playersText}
-                onChange={(e) => setPlayersText(e.target.value)}
-                placeholder={`Un joueur par ligne
-
-Exemples :
-Alexandre Griffet
-Léa Martin ; lea@email.fr
-Hugo Petit, hugo@email.fr`}
-                style={textareaStyle}
-              />
-            </div>
-
-            <div style={hintStyle}>
-              Formats acceptés :
-              <br />
-              • Prénom Nom
-              <br />
-              • Prénom Nom ; email@domaine.fr
-              <br />
-              • Prénom Nom, email@domaine.fr
-            </div>
-          </div>
-
-          <div style={actionRowStyle}>
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                ...primaryButtonStyle,
-                opacity: loading ? 0.7 : 1
-              }}
-            >
-              {loading
-                ? 'Génération en cours…'
-                : 'Créer le club / équipe / joueurs / passations'}
-            </button>
-
-            <button type="button" onClick={resetForm} style={secondaryButtonStyle}>
-              Réinitialiser
-            </button>
-          </div>
-
-          {message ? <div style={successBoxStyle}>{message}</div> : null}
-          {errorMessage ? <div style={errorBoxStyle}>{errorMessage}</div> : null}
-        </form>
+        )}
       </section>
 
-      <section style={threeColsStyle}>
+      <section style={twoColumnsStyle}>
         <div style={panelStyle}>
-          <h2 style={sectionTitleStyle}>Prévisualisation</h2>
-          {parsedPlayers.length === 0 ? (
-            <div style={mutedStyle}>Aucun joueur détecté.</div>
+          <div style={panelHeaderStyle}>
+            <h2 style={panelTitleStyle}>Dernières passations du club</h2>
+            <p style={panelTextStyle}>Vision rapide des passations créées dans ce club.</p>
+          </div>
+
+          {state.passations.length === 0 ? (
+            <div style={emptyStyle}>Aucune passation disponible.</div>
           ) : (
-            <div style={{ display: 'grid', gap: 10 }}>
-              {parsedPlayers.map((player, index) => (
-                <div key={`${player.raw}-${index}`} style={previewItemStyle}>
-                  <div style={{ fontWeight: 800, color: '#16233b' }}>
-                    {[player.firstname, player.lastname].filter(Boolean).join(' ') || 'Sans nom'}
+            <div style={listStyle}>
+              {state.passations.slice(0, 8).map((item, index) => {
+                const player = item.player_id ? playersById.get(item.player_id) : undefined
+                const team = item.team_id ? teamsById.get(item.team_id) : undefined
+
+                return (
+                  <div key={`${item.token || item.id || 'passation'}-${index}`} style={rowCardStyle}>
+                    <div style={rowTopStyle}>
+                      <div style={rowMainTitleStyle}>
+                        {player ? getPlayerFullName(player) : 'Joueur non rattaché'}
+                      </div>
+
+                      <span
+                        style={{
+                          ...statusBadgeStyle,
+                          ...getStatusStyle(item.status)
+                        }}
+                      >
+                        {getStatusLabel(item.status)}
+                      </span>
+                    </div>
+
+                    <div style={metaGridStyle}>
+                      <MetaBox label="Module" value={item.module || '—'} />
+                      <MetaBox label="Équipe" value={getTeamLabel(team)} />
+                      <MetaBox label="Token" value={item.token || '—'} mono />
+                      <MetaBox label="Créée le" value={formatDate(item.created_at)} />
+                    </div>
                   </div>
-                  <div style={{ fontSize: 14, color: '#667085', marginTop: 6 }}>
-                    {player.email || 'Sans email'}
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        <div style={panelStyle}>
+          <div style={panelHeaderStyle}>
+            <h2 style={panelTitleStyle}>Derniers résultats CMP du club</h2>
+            <p style={panelTextStyle}>Les derniers diagnostics effectivement enregistrés.</p>
+          </div>
+
+          {state.cmpResults.length === 0 ? (
+            <div style={emptyStyle}>Aucun résultat CMP disponible.</div>
+          ) : (
+            <div style={listStyle}>
+              {state.cmpResults.slice(0, 8).map((item, index) => (
+                <div key={`${item.token || 'result'}-${index}`} style={rowCardStyle}>
+                  <div style={rowTopStyle}>
+                    <div style={rowMainTitleStyle}>{getPlayerFullName(item)}</div>
+                    <span style={scorePillStyle}>
+                      {typeof item.score_global === 'number' ? `${item.score_global}/100` : '—'}
+                    </span>
+                  </div>
+
+                  <div style={metaGridStyle}>
+                    <MetaBox label="Profil" value={item.profile_label || '—'} />
+                    <MetaBox label="Code" value={item.profile_code || '—'} />
+                    <MetaBox label="Token" value={item.token || '—'} mono />
+                    <MetaBox label="Date résultat" value={formatDate(item.created_at)} />
                   </div>
                 </div>
               ))}
             </div>
           )}
         </div>
-
-        <div style={panelStyle}>
-          <h2 style={sectionTitleStyle}>Résumé opération</h2>
-          <div style={{ display: 'grid', gap: 12 }}>
-            <StatLine
-              label="Mode club"
-              value={clubMode === 'new' ? 'Création nouveau club' : 'Club existant'}
-            />
-            <StatLine
-              label="Mode équipe"
-              value={teamMode === 'new' ? 'Création nouvelle équipe' : 'Équipe existante'}
-            />
-            <StatLine label="Module" value={moduleName} />
-            <StatLine label="Joueurs détectés" value={String(parsedPlayers.length)} />
-            <StatLine label="Club créé" value={createdClubId || '—'} mono />
-            <StatLine label="Équipe créée" value={createdTeamId || '—'} mono />
-          </div>
-        </div>
-
-        <div style={panelStyle}>
-          <h2 style={sectionTitleStyle}>Base actuelle</h2>
-          {loadingData ? (
-            <div style={mutedStyle}>Chargement…</div>
-          ) : (
-            <div style={{ display: 'grid', gap: 12 }}>
-              <StatLine label="Clubs" value={String(clubs.length)} />
-              <StatLine label="Équipes" value={String(teams.length)} />
-              <StatLine
-                label="Dernier club"
-                value={clubs[0] ? clubLabel(clubs[0]) : '—'}
-              />
-              <StatLine
-                label="Dernière équipe"
-                value={teams[0] ? teamLabel(teams[0]) : '—'}
-              />
-            </div>
-          )}
-        </div>
-      </section>
-
-      {createdLinks.length > 0 ? (
-        <section style={{ ...panelStyle, marginTop: 24 }}>
-          <div style={linksHeaderStyle}>
-            <h2 style={sectionTitleStyle}>Liens de passation générés</h2>
-
-            <button type="button" onClick={copyAllLinks} style={secondaryButtonStyle}>
-              Copier tous les liens
-            </button>
-          </div>
-
-          <div style={{ display: 'grid', gap: 14 }}>
-            {createdLinks.map((item, index) => (
-              <div key={`${item.token}-${index}`} style={linkCardStyle}>
-                <div style={linkCardTopStyle}>
-                  <div>
-                    <div style={{ fontWeight: 900, color: '#16233b', fontSize: 20 }}>
-                      {[item.firstname, item.lastname].filter(Boolean).join(' ') ||
-                        `Joueur ${index + 1}`}
-                    </div>
-                    <div style={{ marginTop: 6, color: '#667085' }}>
-                      {item.email || 'Sans email'}
-                    </div>
-                  </div>
-
-                  <div style={tokenBadgeStyle}>{item.token}</div>
-                </div>
-
-                <div style={urlBoxStyle}>{item.link}</div>
-
-                <div style={actionRowStyle}>
-                  <button
-                    type="button"
-                    onClick={() => copyOneLink(item.link)}
-                    style={secondaryButtonStyle}
-                  >
-                    Copier
-                  </button>
-
-                  <a
-                    href={item.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={primaryLinkStyle}
-                  >
-                    Ouvrir
-                  </a>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      <section style={{ ...panelStyle, marginTop: 24 }}>
-        <h2 style={sectionTitleStyle}>Raccourcis cockpit</h2>
-
-        <div style={shortcutGridStyle}>
-          <Link href="/admin/passations" style={shortcutStyle}>
-            Voir toutes les passations
-          </Link>
-
-          <Link href="/admin/resultats" style={shortcutStyle}>
-            Voir tous les résultats
-          </Link>
-
-          <Link href="/club/import-equipe" style={shortcutStyle}>
-            Ancienne page import équipe
-          </Link>
-        </div>
       </section>
     </main>
   )
 }
 
-function StatLine({
+function MiniStat({
+  label,
+  value
+}: {
+  label: string
+  value: string
+}) {
+  return (
+    <div style={miniStatStyle}>
+      <div style={miniStatLabelStyle}>{label}</div>
+      <div style={miniStatValueStyle}>{value}</div>
+    </div>
+  )
+}
+
+function MetaBox({
   label,
   value,
   mono = false
@@ -722,13 +609,18 @@ function StatLine({
   mono?: boolean
 }) {
   return (
-    <div style={statLineStyle}>
-      <div style={statLineLabelStyle}>{label}</div>
+    <div style={metaBoxStyle}>
+      <div style={metaLabelStyle}>{label}</div>
       <div
         style={{
-          ...statLineValueStyle,
-          fontFamily: mono ? 'monospace' : 'inherit',
-          fontSize: mono ? 13 : 18
+          ...metaValueStyle,
+          ...(mono
+            ? {
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                fontSize: 13,
+                wordBreak: 'break-all'
+              }
+            : null)
         }}
       >
         {value}
@@ -738,310 +630,334 @@ function StatLine({
 }
 
 const pageStyle: CSSProperties = {
-  maxWidth: 1440,
+  maxWidth: 1480,
   margin: '0 auto',
-  padding: 24
+  padding: 24,
+  background: '#eef2f7'
 }
 
-const headerWrap: CSSProperties = {
+const heroStyle: CSSProperties = {
+  background: 'linear-gradient(135deg, #ffffff 0%, #f8fbff 100%)',
+  borderRadius: 30,
+  padding: 30,
+  boxShadow: '0 18px 48px rgba(18, 35, 66, 0.08)',
+  marginBottom: 24
+}
+
+const heroTopStyle: CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
-  alignItems: 'flex-start',
-  gap: 16,
+  gap: 20,
   flexWrap: 'wrap',
-  marginBottom: 24
+  alignItems: 'flex-start'
 }
 
 const eyebrowStyle: CSSProperties = {
   fontSize: 13,
-  fontWeight: 800,
-  letterSpacing: '0.16em',
+  fontWeight: 900,
+  letterSpacing: '0.18em',
   textTransform: 'uppercase',
-  color: '#6f7f9d',
-  marginBottom: 10
+  color: '#7180a0',
+  marginBottom: 12
 }
 
-const titleStyle: CSSProperties = {
+const heroTitleStyle: CSSProperties = {
   margin: 0,
-  fontSize: 52,
-  lineHeight: 1,
-  color: '#16233b'
+  fontSize: 56,
+  lineHeight: 1.02,
+  color: '#182847',
+  maxWidth: 860
 }
 
-const introStyle: CSSProperties = {
-  marginTop: 14,
-  maxWidth: 900,
-  fontSize: 19,
+const heroTextStyle: CSSProperties = {
+  margin: '18px 0 0 0',
+  fontSize: 22,
   lineHeight: 1.75,
-  color: '#5f6f8e'
+  color: '#5f6f8e',
+  maxWidth: 980
 }
 
-const headerButtonsStyle: CSSProperties = {
-  display: 'flex',
-  gap: 10,
-  flexWrap: 'wrap'
-}
-
-const heroCardStyle: CSSProperties = {
-  background: '#fff',
-  borderRadius: 28,
-  padding: 28,
-  boxShadow: '0 14px 40px rgba(21,37,69,0.08)',
-  marginBottom: 24
-}
-
-const panelStyle: CSSProperties = {
-  background: '#fff',
-  borderRadius: 24,
-  padding: 24,
-  boxShadow: '0 14px 40px rgba(21,37,69,0.08)'
-}
-
-const twoColsStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-  gap: 20
-}
-
-const threeColsStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-  gap: 20
-}
-
-const sectionTitleStyle: CSSProperties = {
-  marginTop: 0,
-  marginBottom: 18,
-  fontSize: 30,
-  lineHeight: 1.1,
-  color: '#16233b'
-}
-
-const switchRowStyle: CSSProperties = {
+const pillRowStyle: CSSProperties = {
   display: 'flex',
   gap: 10,
   flexWrap: 'wrap',
-  marginBottom: 18
+  marginTop: 18
 }
 
-const tabStyle: CSSProperties = {
-  appearance: 'none',
-  border: '1px solid #d7deea',
-  background: '#fff',
-  color: '#2f4d85',
-  borderRadius: 14,
-  padding: '12px 16px',
-  fontWeight: 700,
-  cursor: 'pointer'
-}
-
-const tabActiveStyle: CSSProperties = {
-  ...tabStyle,
-  background: '#eef2ff',
-  border: '1px solid #cfd8ff'
-}
-
-const fieldWrapStyle: CSSProperties = {
-  display: 'grid',
-  gap: 8,
-  marginBottom: 16
-}
-
-const labelStyle: CSSProperties = {
-  fontWeight: 800,
-  color: '#16233b'
-}
-
-const inputStyle: CSSProperties = {
-  width: '100%',
-  border: '1px solid #d7deea',
-  borderRadius: 16,
-  background: '#fff',
-  minHeight: 56,
-  padding: '14px 16px',
-  fontSize: 18,
-  color: '#1e2b45',
-  outline: 'none'
-}
-
-const textareaStyle: CSSProperties = {
-  ...inputStyle,
-  minHeight: 220,
-  resize: 'vertical',
-  fontFamily: 'inherit'
-}
-
-const hintStyle: CSSProperties = {
-  fontSize: 14,
-  color: '#667085',
-  lineHeight: 1.7
-}
-
-const actionRowStyle: CSSProperties = {
-  display: 'flex',
-  gap: 12,
-  flexWrap: 'wrap'
-}
-
-const primaryButtonStyle: CSSProperties = {
-  appearance: 'none',
-  border: 'none',
-  cursor: 'pointer',
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 8,
-  padding: '15px 20px',
-  borderRadius: 16,
-  fontWeight: 800,
-  fontSize: 16,
-  background: 'linear-gradient(135deg, #2f4d85 0%, #395da0 100%)',
-  color: '#fff',
-  boxShadow: '0 8px 22px rgba(47, 77, 133, 0.22)'
-}
-
-const secondaryButtonStyle: CSSProperties = {
-  appearance: 'none',
-  border: '1px solid #cfd8e6',
-  cursor: 'pointer',
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 8,
-  padding: '15px 20px',
-  borderRadius: 16,
-  fontWeight: 800,
-  fontSize: 16,
-  background: '#fff',
-  color: '#2f4d85',
-  textDecoration: 'none'
-}
-
-const secondaryLinkStyle: CSSProperties = {
-  ...secondaryButtonStyle
-}
-
-const primaryLinkStyle: CSSProperties = {
-  ...primaryButtonStyle,
-  textDecoration: 'none'
-}
-
-const successBoxStyle: CSSProperties = {
-  padding: 16,
-  borderRadius: 16,
-  background: '#ecfdf3',
-  border: '1px solid #abefc6',
-  color: '#067647',
-  fontWeight: 800,
-  lineHeight: 1.6
-}
-
-const errorBoxStyle: CSSProperties = {
-  padding: 16,
-  borderRadius: 16,
-  background: '#fef3f2',
-  border: '1px solid #fecdca',
-  color: '#b42318',
-  fontWeight: 800,
-  lineHeight: 1.6
-}
-
-const mutedStyle: CSSProperties = {
-  color: '#667085',
-  fontSize: 17
-}
-
-const previewItemStyle: CSSProperties = {
-  border: '1px solid #e2e8f4',
-  borderRadius: 16,
-  padding: 14,
-  background: '#f8fafd'
-}
-
-const statLineStyle: CSSProperties = {
-  display: 'grid',
-  gap: 6,
-  padding: 12,
-  borderRadius: 16,
-  background: '#f8fafd',
-  border: '1px solid #e2e8f4'
-}
-
-const statLineLabelStyle: CSSProperties = {
-  fontSize: 14,
-  fontWeight: 800,
-  color: '#6f7f9d'
-}
-
-const statLineValueStyle: CSSProperties = {
-  color: '#16233b',
-  fontWeight: 800,
-  wordBreak: 'break-word'
-}
-
-const linksHeaderStyle: CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  gap: 12,
-  flexWrap: 'wrap',
-  marginBottom: 18
-}
-
-const linkCardStyle: CSSProperties = {
-  border: '1px solid #e2e8f4',
-  background: '#f8fafd',
-  borderRadius: 18,
-  padding: 16
-}
-
-const linkCardTopStyle: CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  gap: 12,
-  flexWrap: 'wrap',
-  marginBottom: 10
-}
-
-const tokenBadgeStyle: CSSProperties = {
+const pillStyle: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   padding: '10px 14px',
   borderRadius: 999,
   background: '#eef2ff',
   color: '#34518b',
-  fontWeight: 800,
-  fontFamily: 'monospace',
-  fontSize: 13,
-  wordBreak: 'break-all'
+  fontWeight: 800
 }
 
-const urlBoxStyle: CSSProperties = {
-  background: '#0c244b',
-  color: '#eef4ff',
+const heroActionsStyle: CSSProperties = {
+  display: 'flex',
+  gap: 12,
+  flexWrap: 'wrap',
+  alignItems: 'center'
+}
+
+const primaryButtonStyle: CSSProperties = {
+  textDecoration: 'none',
+  padding: '14px 20px',
   borderRadius: 16,
-  padding: 14,
-  fontFamily: 'monospace',
-  fontSize: 13,
-  lineHeight: 1.7,
-  wordBreak: 'break-all'
+  border: 'none',
+  color: '#ffffff',
+  background: 'linear-gradient(135deg, #2f4d85 0%, #4168b0 100%)',
+  fontWeight: 800,
+  fontSize: 16,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  boxShadow: '0 12px 26px rgba(47, 77, 133, 0.22)'
 }
 
-const shortcutGridStyle: CSSProperties = {
+const secondaryButtonStyle: CSSProperties = {
+  textDecoration: 'none',
+  padding: '14px 20px',
+  borderRadius: 16,
+  border: '1px solid #d8e1ef',
+  color: '#284378',
+  background: '#ffffff',
+  fontWeight: 800,
+  fontSize: 16,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center'
+}
+
+const smallPrimaryButtonStyle: CSSProperties = {
+  textDecoration: 'none',
+  padding: '10px 14px',
+  borderRadius: 12,
+  border: 'none',
+  color: '#ffffff',
+  background: 'linear-gradient(135deg, #2f4d85 0%, #4168b0 100%)',
+  fontWeight: 800,
+  fontSize: 14,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center'
+}
+
+const gridStatsStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+  gap: 18,
+  marginBottom: 24
+}
+
+const statCardStyle: CSSProperties = {
+  background: '#ffffff',
+  borderRadius: 26,
+  padding: 24,
+  boxShadow: '0 14px 40px rgba(21,37,69,0.08)'
+}
+
+const statValueStyle: CSSProperties = {
+  fontSize: 58,
+  lineHeight: 1,
+  fontWeight: 900,
+  color: '#223461',
+  marginBottom: 12
+}
+
+const statLabelStyle: CSSProperties = {
+  fontSize: 20,
+  lineHeight: 1.35,
+  fontWeight: 800,
+  color: '#667085'
+}
+
+const statHelperStyle: CSSProperties = {
+  marginTop: 8,
+  fontSize: 14,
+  lineHeight: 1.5,
+  color: '#8a96ad'
+}
+
+const panelStyle: CSSProperties = {
+  background: '#ffffff',
+  borderRadius: 28,
+  boxShadow: '0 14px 40px rgba(21,37,69,0.08)',
+  overflow: 'hidden',
+  marginBottom: 24
+}
+
+const panelHeaderStyle: CSSProperties = {
+  padding: 24,
+  borderBottom: '1px solid #e5ebf5'
+}
+
+const panelTitleStyle: CSSProperties = {
+  margin: 0,
+  fontSize: 38,
+  lineHeight: 1.05,
+  color: '#182847'
+}
+
+const panelTextStyle: CSSProperties = {
+  margin: '12px 0 0 0',
+  fontSize: 18,
+  lineHeight: 1.7,
+  color: '#667085'
+}
+
+const emptyStyle: CSSProperties = {
+  padding: 24,
+  fontSize: 18,
+  lineHeight: 1.7,
+  color: '#667085'
+}
+
+const cardGridStyle: CSSProperties = {
+  padding: 24,
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+  gap: 16
+}
+
+const teamCardStyle: CSSProperties = {
+  border: '1px solid #e1e8f3',
+  borderRadius: 22,
+  background: '#f8fafd',
+  padding: 18
+}
+
+const teamCardTopStyle: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  gap: 12,
+  flexWrap: 'wrap',
+  marginBottom: 16
+}
+
+const teamTitleStyle: CSSProperties = {
+  fontSize: 24,
+  fontWeight: 900,
+  color: '#182847',
+  marginBottom: 8
+}
+
+const teamSubStyle: CSSProperties = {
+  fontSize: 15,
+  lineHeight: 1.6,
+  color: '#667085'
+}
+
+const miniStatsGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gap: 12
+}
+
+const miniStatStyle: CSSProperties = {
+  padding: 14,
+  borderRadius: 16,
+  background: '#ffffff',
+  border: '1px solid #e1e8f3'
+}
+
+const miniStatLabelStyle: CSSProperties = {
+  fontSize: 12,
+  fontWeight: 900,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+  color: '#7a869d',
+  marginBottom: 8
+}
+
+const miniStatValueStyle: CSSProperties = {
+  fontSize: 24,
+  fontWeight: 900,
+  color: '#1d2d4e'
+}
+
+const twoColumnsStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))',
+  gap: 24,
+  marginBottom: 24
+}
+
+const listStyle: CSSProperties = {
+  padding: 24,
+  display: 'grid',
   gap: 14
 }
 
-const shortcutStyle: CSSProperties = {
-  textDecoration: 'none',
-  padding: '18px 20px',
-  borderRadius: 18,
-  border: '1px solid #d5ddea',
+const rowCardStyle: CSSProperties = {
+  border: '1px solid #e1e8f3',
+  borderRadius: 22,
   background: '#f8fafd',
-  color: '#173A73',
-  fontWeight: 800,
+  padding: 18
+}
+
+const rowTopStyle: CSSProperties = {
   display: 'flex',
+  justifyContent: 'space-between',
+  gap: 12,
+  flexWrap: 'wrap',
   alignItems: 'center',
-  justifyContent: 'center'
+  marginBottom: 14
+}
+
+const rowMainTitleStyle: CSSProperties = {
+  fontSize: 21,
+  fontWeight: 900,
+  color: '#182847'
+}
+
+const statusBadgeStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  padding: '8px 12px',
+  borderRadius: 999,
+  fontWeight: 900,
+  fontSize: 14
+}
+
+const scorePillStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  padding: '8px 14px',
+  borderRadius: 999,
+  background: '#eef2ff',
+  color: '#34518b',
+  fontWeight: 900,
+  fontSize: 15
+}
+
+const metaGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+  gap: 12
+}
+
+const metaBoxStyle: CSSProperties = {
+  padding: 14,
+  borderRadius: 16,
+  border: '1px solid #e2e8f4',
+  background: '#ffffff'
+}
+
+const metaLabelStyle: CSSProperties = {
+  fontSize: 12,
+  fontWeight: 900,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+  color: '#7a869d',
+  marginBottom: 8
+}
+
+const metaValueStyle: CSSProperties = {
+  fontSize: 16,
+  lineHeight: 1.5,
+  fontWeight: 800,
+  color: '#1e2b45'
 }
