@@ -65,6 +65,7 @@ function getServerClient() {
 
 function formatDate(value?: string | null) {
   if (!value) return '—'
+
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
 
@@ -203,19 +204,23 @@ export default async function TeamDashboardPage({ params }: PageProps) {
     )
   }
 
-  const { data: players = [] } = await supabase
+  const playersResponse = await supabase
     .from('players')
     .select('id, firstname, lastname, email, position, team_id, created_at')
     .eq('team_id', teamId)
     .order('created_at', { ascending: true })
     .returns<PlayerRow[]>()
 
-  const { data: passations = [] } = await supabase
+  const players: PlayerRow[] = playersResponse.data ?? []
+
+  const passationsResponse = await supabase
     .from('passations')
     .select('id, player_id, team_id, club_id, module, token, status, created_at')
     .eq('team_id', teamId)
     .order('created_at', { ascending: false })
     .returns<PassationRow[]>()
+
+  const passations: PassationRow[] = passationsResponse.data ?? []
 
   const passationTokens = passations
     .map((item) => item.token)
@@ -224,7 +229,7 @@ export default async function TeamDashboardPage({ params }: PageProps) {
   let cmpResults: CmpResultRow[] = []
 
   if (passationTokens.length > 0) {
-    const { data } = await supabase
+    const cmpResultsResponse = await supabase
       .from('cmp_results')
       .select(
         'token, module, firstname, lastname, email, club_structure, profile_code, profile_label, score_global, created_at'
@@ -232,7 +237,7 @@ export default async function TeamDashboardPage({ params }: PageProps) {
       .in('token', passationTokens)
       .returns<CmpResultRow[]>()
 
-    cmpResults = data || []
+    cmpResults = cmpResultsResponse.data ?? []
   }
 
   const passationsByPlayerId = new Map<string, PassationRow>()
