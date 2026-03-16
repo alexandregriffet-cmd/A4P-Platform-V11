@@ -71,6 +71,7 @@ type PortalState = {
   userEmail: string
   profile: ProfileRow | null
   club: ClubRow | null
+  clubs: ClubRow[]
   teams: TeamRow[]
   players: PlayerRow[]
   passations: PassationRow[]
@@ -101,8 +102,11 @@ function getTeamLabel(team?: TeamRow | null) {
 function getPlayerFullName(player?: {
   firstname?: string | null
   lastname?: string | null
+  full_name?: string | null
 }) {
   if (!player) return 'Sportif'
+  if (player.full_name?.trim()) return player.full_name.trim()
+
   const fullName = [player.firstname || '', player.lastname || '']
     .filter(Boolean)
     .join(' ')
@@ -157,6 +161,36 @@ function scoreAverage(values: Array<number | null | undefined>) {
   return Math.round(numeric.reduce((sum, value) => sum + value, 0) / numeric.length)
 }
 
+function chooseBestProfile(profiles: ProfileRow[], userEmail: string) {
+  if (!profiles.length) return null
+
+  const normalizedEmail = userEmail.trim().toLowerCase()
+
+  const activeProfiles = profiles.filter((profile) => profile.status !== 'inactive')
+  const source = activeProfiles.length ? activeProfiles : profiles
+
+  const exactEmail = source.filter(
+    (profile) => (profile.email || '').trim().toLowerCase() === normalizedEmail
+  )
+  const exactSource = exactEmail.length ? exactEmail : source
+
+  const adminWithClub = exactSource.find(
+    (profile) => profile.role === 'admin' && Boolean(profile.club_id)
+  )
+  if (adminWithClub) return adminWithClub
+
+  const clubProfile = exactSource.find((profile) => profile.role === 'club' && Boolean(profile.club_id))
+  if (clubProfile) return clubProfile
+
+  const adminProfile = exactSource.find((profile) => profile.role === 'admin')
+  if (adminProfile) return adminProfile
+
+  const withClub = exactSource.find((profile) => Boolean(profile.club_id))
+  if (withClub) return withClub
+
+  return exactSource[0]
+}
+
 function StatCard({
   value,
   label,
@@ -182,6 +216,7 @@ export default function ClubPortalPage() {
     userEmail: '',
     profile: null,
     club: null,
+    clubs: [],
     teams: [],
     players: [],
     passations: [],
@@ -208,35 +243,136 @@ export default function ClubPortalPage() {
           throw new Error('Aucun utilisateur connecté. Connecte-toi pour accéder au portail club.')
         }
 
-        const { data: profile, error: profileError } = await supabase
+        const userEmail = user.email || ''
+
+        const { data: profilesByUserId, error: profilesByUserIdError } = await supabase
           .from('profiles')
           .select(
             'id, user_id, role, club_id, player_id, firstname, lastname, full_name, email, status'
           )
           .eq('user_id', user.id)
-          .single<ProfileRow>()
+          .returns<ProfileRow[]>()
 
-        if (profileError || !profile) {
+        if (profilesByUserIdError) {
+          throw new Error(profilesByUserIdError.message)
+        }
+
+        let profileCandidates = profilesByUserId ?? []
+
+        if (!profileCandidates.length && userEmail) {
+          const { data: profilesByEmail, error: profilesByEmailError } = await supabase
+            .from('profiles')
+            .select(
+              'id, user_id, role, club_id, player_id, firstname, lastname, full_name, email, status'
+            )
+            .ilike('email', userEmail)
+            .returns<ProfileRow[]>()
+
+          if (profilesByEmailError) {
+            throw new Error(profilesByEmailError.message)
+          }
+
+          profileCandidates = profilesByEmail ?? []
+        }
+
+        const profile = chooseBestProfile(profileCandidates, userEmail)
+
+        if (!profile) {
           throw new Error(
-            "Profil introuvable. Ton utilisateur n'est pas encore rattaché à la table profiles."
+            "Profil introuvable. Vérifie que ton utilisateur est bien relié à la table profiles."
           )
         }
 
-        if (!profile.club_id && profile.role !== 'admin') {
+        const isAdmin = profile.role === 'admin'
+        const clubId = profile.club_id || ''
+
+        if (!isAdmin && !clubId) {
           throw new Error(
             "Ce compte n'est rattaché à aucun club. Renseigne club_id dans profiles pour ouvrir le portail club."
           )
         }
 
-        const clubId = profile.club_id || ''
-
+        let clubs: ClubRow[] = []
         let club: ClubRow | null = null
         let teams: TeamRow[] = []
         let players: PlayerRow[] = []
         let passations: PassationRow[] = []
         let cmpResults: CmpResultRow[] = []
 
-        if (clubId) {
+        if (isAdmin) {
+          const [
+            clubsResponse,
+            teamsResponse,
+            passationsResponse
+          ] = await Promise.all([
+            supabase
+              .from('clubs')
+              .select('id, name, club_name, created_at')
+              .order('created_at', { ascending: false })
+              .returns<ClubRow[]>(),
+            supabase
+              .from('teams')
+              .select('id, name, team_name, season, club_id, created_at')
+              .order('created_at', { ascending: false })
+              .returns<TeamRow[]>(),
+            supabase
+              .from('passations')
+              .select('id, token, module, status, player_id, team_id, club_id, created_at')
+              .order('created_at', { ascending: false })
+              .returns<PassationRow[]>()
+          ])
+
+          if (clubsResponse.error) throw new Error(clubsResponse.error.message)
+          if (teamsResponse.error) throw new Error(teamsResponse.error.message)
+          if (passationsResponse.error) throw new Error(passationsResponse.error.message)
+
+          clubs = clubsResponse.data ?? []
+          teams = teamsResponse.data ?? []
+          passations = passationsResponse.data ?? []
+
+          if (clubId) {
+            club = clubs.find((item) => item.id === clubId) || null
+          } else {
+            club = clubs[0] ?? null
+          }
+
+          const teamIds = teams.map((team) => team.id)
+          if (teamIds.length > 0) {
+            const { data: playersData, error: playersError } = await supabase
+              .from('players')
+              .select('id, firstname, lastname, email, team_id, created_at')
+              .in('team_id', teamIds)
+              .order('created_at', { ascending: false })
+              .returns<PlayerRow[]>()
+
+            if (playersError) {
+              throw new Error(playersError.message)
+            }
+
+            players = playersData ?? []
+          }
+
+          const passationTokens = passations
+            .map((item) => item.token)
+            .filter((token): token is string => Boolean(token))
+
+          if (passationTokens.length > 0) {
+            const { data: cmpData, error: cmpError } = await supabase
+              .from('cmp_results')
+              .select(
+                'token, firstname, lastname, email, profile_code, profile_label, score_global, created_at'
+              )
+              .in('token', passationTokens)
+              .order('created_at', { ascending: false })
+              .returns<CmpResultRow[]>()
+
+            if (cmpError) {
+              throw new Error(cmpError.message)
+            }
+
+            cmpResults = cmpData ?? []
+          }
+        } else {
           const [
             clubResponse,
             teamsResponse,
@@ -246,7 +382,7 @@ export default function ClubPortalPage() {
               .from('clubs')
               .select('id, name, club_name, created_at')
               .eq('id', clubId)
-              .single<ClubRow>(),
+              .maybeSingle<ClubRow>(),
             supabase
               .from('teams')
               .select('id, name, team_name, season, club_id, created_at')
@@ -261,11 +397,12 @@ export default function ClubPortalPage() {
               .returns<PassationRow[]>()
           ])
 
-          if (clubResponse.error) {
-            throw new Error(clubResponse.error.message)
-          }
+          if (clubResponse.error) throw new Error(clubResponse.error.message)
+          if (teamsResponse.error) throw new Error(teamsResponse.error.message)
+          if (passationsResponse.error) throw new Error(passationsResponse.error.message)
 
           club = clubResponse.data ?? null
+          clubs = club ? [club] : []
           teams = teamsResponse.data ?? []
           passations = passationsResponse.data ?? []
 
@@ -311,9 +448,10 @@ export default function ClubPortalPage() {
           setState({
             loading: false,
             error: '',
-            userEmail: user.email || profile.email || '',
+            userEmail,
             profile,
             club,
+            clubs,
             teams,
             players,
             passations,
@@ -360,6 +498,7 @@ export default function ClubPortalPage() {
     return map
   }, [state.cmpResults])
 
+  const totalClubs = state.clubs.length
   const totalTeams = state.teams.length
   const totalPlayers = state.players.length
   const totalPassations = state.passations.length
@@ -410,10 +549,18 @@ export default function ClubPortalPage() {
         <div style={heroTopStyle}>
           <div>
             <div style={eyebrowStyle}>Portail club sécurisé</div>
-            <h1 style={heroTitleStyle}>{getClubLabel(state.club)}</h1>
+            <h1 style={heroTitleStyle}>
+              {state.profile?.role === 'admin'
+                ? state.club
+                  ? `Vue club — ${getClubLabel(state.club)}`
+                  : 'Vue administrateur'
+                : getClubLabel(state.club)}
+            </h1>
+
             <p style={heroTextStyle}>
-              Ce portail affiche uniquement les données du club rattaché au compte connecté :
-              équipes, joueurs, passations, progression et réponses CMP.
+              {state.profile?.role === 'admin'
+                ? "Compte administrateur détecté. Cette vue agrège les données disponibles pour contrôler le portail club et vérifier les accès."
+                : "Ce portail affiche uniquement les données du club rattaché au compte connecté : équipes, joueurs, passations, progression et réponses CMP."}
             </p>
 
             <div style={pillRowStyle}>
@@ -438,31 +585,32 @@ export default function ClubPortalPage() {
       </section>
 
       <section style={gridStatsStyle}>
-        <StatCard value={totalTeams} label="équipes" helper="équipes du club" />
+        <StatCard value={totalClubs} label="clubs visibles" helper="clubs chargés" />
+        <StatCard value={totalTeams} label="équipes" helper="équipes chargées" />
         <StatCard value={totalPlayers} label="joueurs" helper="sportifs rattachés" />
-        <StatCard value={totalPassations} label="passations" helper="liens du club" />
-        <StatCard value={totalCmpResults} label="réponses CMP" helper="résultats du club" />
+        <StatCard value={totalPassations} label="passations" helper="liens du portail" />
       </section>
 
       <section style={gridStatsStyle}>
+        <StatCard value={totalCmpResults} label="réponses CMP" helper="résultats disponibles" />
         <StatCard value={completedCount} label="terminées" helper="tests complétés" />
         <StatCard value={pendingCount} label="à faire" helper="liens non utilisés" />
         <StatCard value={inProgressCount} label="en cours" helper="questionnaires entamés" />
         <StatCard value={sentCount} label="envoyées" helper="passations transmises" />
-        <StatCard value={averageCmpScore} label="score moyen CMP" helper="moyenne club" />
+        <StatCard value={averageCmpScore} label="score moyen CMP" helper="moyenne visible" />
         <StatCard value={lastResultDate} label="dernier résultat" helper="réponse récente" />
       </section>
 
       <section style={panelStyle}>
         <div style={panelHeaderStyle}>
-          <h2 style={panelTitleStyle}>Équipes du club</h2>
+          <h2 style={panelTitleStyle}>Équipes visibles</h2>
           <p style={panelTextStyle}>
             Chaque carte donne accès au dashboard équipe déjà construit dans V11.
           </p>
         </div>
 
         {state.teams.length === 0 ? (
-          <div style={emptyStyle}>Aucune équipe rattachée à ce club pour le moment.</div>
+          <div style={emptyStyle}>Aucune équipe disponible pour cette vue.</div>
         ) : (
           <div style={cardGridStyle}>
             {state.teams.map((team) => {
@@ -480,7 +628,9 @@ export default function ClubPortalPage() {
                   <div style={teamCardTopStyle}>
                     <div>
                       <div style={teamTitleStyle}>{getTeamLabel(team)}</div>
-                      <div style={teamSubStyle}>Saison : {team.season || '—'}</div>
+                      <div style={teamSubStyle}>
+                        Saison : {team.season || '—'} • Club ID : {team.club_id || '—'}
+                      </div>
                     </div>
 
                     <Link href={`/club/equipe/${team.id}`} style={smallPrimaryButtonStyle}>
@@ -507,8 +657,8 @@ export default function ClubPortalPage() {
       <section style={twoColumnsStyle}>
         <div style={panelStyle}>
           <div style={panelHeaderStyle}>
-            <h2 style={panelTitleStyle}>Dernières passations du club</h2>
-            <p style={panelTextStyle}>Vision rapide des passations créées dans ce club.</p>
+            <h2 style={panelTitleStyle}>Dernières passations visibles</h2>
+            <p style={panelTextStyle}>Vision rapide des passations chargées dans cette vue.</p>
           </div>
 
           {state.passations.length === 0 ? (
@@ -551,8 +701,8 @@ export default function ClubPortalPage() {
 
         <div style={panelStyle}>
           <div style={panelHeaderStyle}>
-            <h2 style={panelTitleStyle}>Derniers résultats CMP du club</h2>
-            <p style={panelTextStyle}>Les derniers diagnostics effectivement enregistrés.</p>
+            <h2 style={panelTitleStyle}>Derniers résultats CMP visibles</h2>
+            <p style={panelTextStyle}>Les derniers diagnostics effectivement disponibles.</p>
           </div>
 
           {state.cmpResults.length === 0 ? (
