@@ -65,7 +65,6 @@ function getServerClient() {
 
 function formatDate(value?: string | null) {
   if (!value) return '—'
-
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
 
@@ -132,37 +131,9 @@ function StatCard({
   label: string
 }) {
   return (
-    <div
-      style={{
-        background: '#fff',
-        borderRadius: 24,
-        padding: 24,
-        boxShadow: '0 14px 40px rgba(21,37,69,0.08)'
-      }}
-    >
-      <div
-        style={{
-          fontSize: 56,
-          lineHeight: 1,
-          fontWeight: 900,
-          color: '#223461',
-          marginBottom: 12,
-          wordBreak: 'break-word'
-        }}
-      >
-        {value}
-      </div>
-
-      <div
-        style={{
-          fontSize: 18,
-          lineHeight: 1.35,
-          fontWeight: 700,
-          color: '#667085'
-        }}
-      >
-        {label}
-      </div>
+    <div style={statCardStyle}>
+      <div style={statValueStyle}>{value}</div>
+      <div style={statLabelStyle}>{label}</div>
     </div>
   )
 }
@@ -179,27 +150,19 @@ export default async function TeamDashboardPage({ params }: PageProps) {
 
   if (teamError || !team) {
     return (
-      <main style={{ maxWidth: 1440, margin: '0 auto', padding: 24 }}>
-        <div
-          style={{
-            background: '#fff',
-            borderRadius: 24,
-            padding: 28,
-            boxShadow: '0 14px 40px rgba(21,37,69,0.08)'
-          }}
-        >
-          <h1 style={{ marginTop: 0, fontSize: 42, color: '#16233b' }}>
-            Équipe introuvable
-          </h1>
-
-          <p style={{ fontSize: 20, lineHeight: 1.7, color: '#5f6f8e' }}>
+      <main style={pageStyle}>
+        <section style={sectionCardStyle}>
+          <div style={eyebrowStyle}>Dashboard équipe</div>
+          <h1 style={titleStyle}>Équipe introuvable</h1>
+          <p style={leadStyle}>
             Je n’ai pas trouvé cette équipe dans la base V11.
           </p>
-
-          <Link href="/club" style={linkButtonStyle}>
-            Retour club
-          </Link>
-        </div>
+          <div style={actionsWrapStyle}>
+            <Link href="/club" style={secondaryButtonStyle}>
+              Retour club
+            </Link>
+          </div>
+        </section>
       </main>
     )
   }
@@ -258,13 +221,15 @@ export default async function TeamDashboardPage({ params }: PageProps) {
 
   const totalPlayers = players.length
   const totalPassations = passations.length
-
-  const completedPassations = passations.filter((item) => item.status === 'completed')
-  const pendingPassations = passations.filter((item) => item.status === 'pending')
-  const inProgressPassations = passations.filter((item) => item.status === 'in_progress')
-  const sentPassations = passations.filter((item) => item.status === 'sent')
-
   const responseCount = cmpResults.length
+
+  const completedCount = passations.filter((item) => item.status === 'completed').length
+  const pendingCount = passations.filter((item) => item.status === 'pending').length
+  const inProgressCount = passations.filter((item) => item.status === 'in_progress').length
+  const sentCount = passations.filter((item) => item.status === 'sent').length
+
+  const completionPercent =
+    totalPassations > 0 ? Math.round((completedCount / totalPassations) * 100) : 0
 
   const scores = cmpResults
     .map((item) => item.score_global)
@@ -274,9 +239,6 @@ export default async function TeamDashboardPage({ params }: PageProps) {
     scores.length > 0
       ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)
       : 0
-
-  const completionPercent =
-    totalPassations > 0 ? Math.round((completedPassations.length / totalPassations) * 100) : 0
 
   const latestResultDate =
     cmpResults.length > 0
@@ -292,62 +254,23 @@ export default async function TeamDashboardPage({ params }: PageProps) {
       : '—'
 
   return (
-    <main style={{ maxWidth: 1440, margin: '0 auto', padding: 24 }}>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          gap: 16,
-          alignItems: 'flex-start',
-          flexWrap: 'wrap',
-          marginBottom: 22
-        }}
-      >
-        <div>
-          <div
-            style={{
-              fontSize: 13,
-              fontWeight: 800,
-              letterSpacing: '0.16em',
-              textTransform: 'uppercase',
-              color: '#6f7f9d',
-              marginBottom: 10
-            }}
-          >
-            Dashboard équipe
-          </div>
+    <main style={pageStyle}>
+      <section style={heroCardStyle}>
+        <div style={eyebrowStyle}>Dashboard équipe</div>
+        <h1 style={heroTitleStyle}>{teamName}</h1>
 
-          <h1
-            style={{
-              margin: 0,
-              fontSize: 54,
-              lineHeight: 1,
-              color: '#16233b'
-            }}
-          >
-            {teamName}
-          </h1>
-
-          <div
-            style={{
-              marginTop: 14,
-              display: 'flex',
-              gap: 10,
-              flexWrap: 'wrap'
-            }}
-          >
-            <span style={pillStyle}>ID équipe : {team.id}</span>
-            <span style={pillStyle}>Saison : {team.season || '—'}</span>
-            <span style={pillStyle}>Club : {team.club_id || '—'}</span>
-          </div>
+        <div style={pillWrapStyle}>
+          <span style={pillStyle}>ID équipe : {team.id}</span>
+          <span style={pillStyle}>Saison : {team.season || '—'}</span>
+          <span style={pillStyle}>Club : {team.club_id || '—'}</span>
         </div>
 
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <Link href="/club" style={linkButtonStyle}>
+        <div style={actionsWrapStyle}>
+          <Link href="/club" style={secondaryButtonStyle}>
             Retour club
           </Link>
 
-          <Link href="/club/import-equipe" style={linkButtonStyle}>
+          <Link href="/club/import-equipe" style={secondaryButtonStyle}>
             Import équipe
           </Link>
 
@@ -355,206 +278,63 @@ export default async function TeamDashboardPage({ params }: PageProps) {
             Voir passations
           </Link>
         </div>
-      </div>
 
-      <section
-        style={{
-          background: '#fff',
-          borderRadius: 28,
-          padding: 28,
-          boxShadow: '0 14px 40px rgba(21,37,69,0.08)',
-          marginBottom: 24
-        }}
-      >
-        <div
-          style={{
-            fontSize: 18,
-            lineHeight: 1.8,
-            color: '#5f6f8e',
-            maxWidth: 980
-          }}
-        >
-          Cette page centralise automatiquement les joueurs, les passations, les réponses
-          CMP, la progression de complétion et l’accès direct aux rapports individuels.
-        </div>
+        <p style={leadStyle}>
+          Cette page centralise automatiquement les joueurs, les passations,
+          les réponses CMP, la progression de complétion et l’accès direct
+          aux rapports individuels. C’est la version club à montrer en rendez-vous.
+        </p>
       </section>
 
-      <section
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: 18,
-          marginBottom: 24
-        }}
-      >
+      <section style={statsGridStyle}>
         <StatCard value={totalPlayers} label="joueurs" />
         <StatCard value={totalPassations} label="passations" />
         <StatCard value={responseCount} label="réponses CMP" />
         <StatCard value={averageScore} label="score moyen CMP" />
+        <StatCard value={pendingCount} label="à faire" />
+        <StatCard value={completedCount} label="terminées" />
+        <StatCard value={inProgressCount} label="en cours" />
+        <StatCard value={sentCount} label="envoyées" />
       </section>
 
-      <section
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: 18,
-          marginBottom: 24
-        }}
-      >
-        <StatCard value={pendingPassations.length} label="pending" />
-        <StatCard value={sentPassations.length} label="sent" />
-        <StatCard value={inProgressPassations.length} label="in progress" />
-        <StatCard value={completedPassations.length} label="completed" />
-      </section>
-
-      <section
-        style={{
-          background: '#fff',
-          borderRadius: 28,
-          boxShadow: '0 14px 40px rgba(21,37,69,0.08)',
-          overflow: 'hidden',
-          marginBottom: 24
-        }}
-      >
-        <div
-          style={{
-            padding: 24,
-            borderBottom: '1px solid #e2e8f4'
-          }}
-        >
-          <h2
-            style={{
-              margin: 0,
-              fontSize: 42,
-              lineHeight: 1,
-              color: '#16233b'
-            }}
-          >
-            Progression équipe
-          </h2>
+      <section style={sectionCardStyle}>
+        <div style={sectionHeaderStyle}>
+          <h2 style={sectionTitleStyle}>Progression équipe</h2>
         </div>
 
-        <div
-          style={{
-            padding: 24,
-            display: 'grid',
-            gap: 18
-          }}
-        >
+        <div style={{ padding: 24, display: 'grid', gap: 22 }}>
           <div>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                fontWeight: 800,
-                color: '#223461',
-                marginBottom: 8
-              }}
-            >
+            <div style={progressHeadStyle}>
               <span>Complétion globale</span>
               <span>{completionPercent}%</span>
             </div>
 
-            <div
-              style={{
-                height: 18,
-                borderRadius: 999,
-                background: '#e8edf7',
-                overflow: 'hidden'
-              }}
-            >
+            <div style={progressTrackStyle}>
               <div
                 style={{
-                  width: `${completionPercent}%`,
-                  height: '100%',
-                  background: 'linear-gradient(90deg, #2f4d85 0%, #7896dd 100%)'
+                  ...progressFillStyle,
+                  width: `${completionPercent}%`
                 }}
               />
             </div>
           </div>
 
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-              gap: 14
-            }}
-          >
-            <div style={miniCardStyle}>
-              <div style={miniCardValueStyle}>{completedPassations.length}</div>
-              <div style={miniCardLabelStyle}>Terminées</div>
-            </div>
-
-            <div style={miniCardStyle}>
-              <div style={miniCardValueStyle}>{inProgressPassations.length}</div>
-              <div style={miniCardLabelStyle}>En cours</div>
-            </div>
-
-            <div style={miniCardStyle}>
-              <div style={miniCardValueStyle}>{sentPassations.length}</div>
-              <div style={miniCardLabelStyle}>Envoyées</div>
-            </div>
-
-            <div style={miniCardStyle}>
-              <div style={miniCardValueStyle}>{pendingPassations.length}</div>
-              <div style={miniCardLabelStyle}>À faire</div>
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-              gap: 14
-            }}
-          >
-            <div style={miniCardStyle}>
-              <div style={miniCardValueStyle}>{responseCount}</div>
-              <div style={miniCardLabelStyle}>Réponses enregistrées</div>
-            </div>
-
-            <div style={miniCardStyle}>
-              <div style={miniCardValueStyle}>{averageScore}</div>
-              <div style={miniCardLabelStyle}>Score moyen</div>
-            </div>
-
-            <div style={miniCardStyle}>
-              <div style={miniCardValueStyle}>{latestResultDate}</div>
-              <div style={miniCardLabelStyle}>Dernière réponse</div>
-            </div>
-
-            <div style={miniCardStyle}>
-              <div style={miniCardValueStyle}>{teamName}</div>
-              <div style={miniCardLabelStyle}>Équipe</div>
-            </div>
+          <div style={statsGridStyle}>
+            <StatCard value={completedCount} label="terminées" />
+            <StatCard value={inProgressCount} label="en cours" />
+            <StatCard value={sentCount} label="envoyées" />
+            <StatCard value={pendingCount} label="à faire" />
+            <StatCard value={responseCount} label="réponses enregistrées" />
+            <StatCard value={averageScore} label="score moyen" />
+            <StatCard value={latestResultDate} label="dernière réponse" />
+            <StatCard value={teamName} label="équipe" />
           </div>
         </div>
       </section>
 
-      <section
-        style={{
-          background: '#fff',
-          borderRadius: 28,
-          boxShadow: '0 14px 40px rgba(21,37,69,0.08)',
-          overflow: 'hidden'
-        }}
-      >
-        <div
-          style={{
-            padding: 24,
-            borderBottom: '1px solid #e2e8f4'
-          }}
-        >
-          <h2
-            style={{
-              margin: 0,
-              fontSize: 42,
-              lineHeight: 1,
-              color: '#16233b'
-            }}
-          >
-            Joueurs et passations
-          </h2>
+      <section style={sectionCardStyle}>
+        <div style={sectionHeaderStyle}>
+          <h2 style={sectionTitleStyle}>Joueurs et passations</h2>
         </div>
 
         {players.length === 0 ? (
@@ -562,166 +342,225 @@ export default async function TeamDashboardPage({ params }: PageProps) {
             Aucun joueur trouvé pour cette équipe.
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table
-              style={{
-                width: '100%',
-                borderCollapse: 'collapse',
-                minWidth: 1320
-              }}
-            >
-              <thead>
-                <tr style={{ background: '#f8fafd' }}>
-                  <th style={thStyle}>Joueur</th>
-                  <th style={thStyle}>Email</th>
-                  <th style={thStyle}>Module</th>
-                  <th style={thStyle}>Statut</th>
-                  <th style={thStyle}>Token</th>
-                  <th style={thStyle}>Réponse</th>
-                  <th style={thStyle}>Score</th>
-                  <th style={thStyle}>Profil</th>
-                  <th style={thStyle}>Date réponse</th>
-                  <th style={thStyle}>Actions</th>
-                </tr>
-              </thead>
+          <div style={playerCardsWrapStyle}>
+            {players.map((player) => {
+              const passation = passationsByPlayerId.get(player.id)
+              const result = passation?.token ? resultsByToken.get(passation.token) : undefined
+              const hasResult = Boolean(result)
 
-              <tbody>
-                {players.map((player) => {
-                  const passation = passationsByPlayerId.get(player.id)
-                  const result = passation?.token ? resultsByToken.get(passation.token) : undefined
-                  const statusStyles = getStatusStyle(passation?.status)
+              const passationLink = passation?.token
+                ? `/passations/${passation.token}`
+                : null
 
-                  const hasResult = Boolean(result)
+              const reportLink = passation?.token
+                ? `https://alexandregriffet-cmd.github.io/CMP-A4P-ACADEMIE-DE-PERFORMANCES-/resultats.html?token=${encodeURIComponent(
+                    passation.token
+                  )}`
+                : null
 
-                  const passationLink = passation?.token
-                    ? `/passations/${passation.token}`
-                    : null
+              return (
+                <article key={player.id} style={playerCardStyle}>
+                  <div style={playerTopRowStyle}>
+                    <div>
+                      <div style={playerNameStyle}>{getFullName(player)}</div>
+                      <div style={playerMetaStyle}>
+                        créé le {formatDate(player.created_at)}
+                      </div>
+                    </div>
 
-                  const reportLink = passation?.token
-                    ? `https://alexandregriffet-cmd.github.io/CMP-A4P-ACADEMIE-DE-PERFORMANCES-/resultats.html?token=${encodeURIComponent(
-                        passation.token
-                      )}`
-                    : null
+                    <span
+                      style={{
+                        ...statusPillStyle,
+                        ...getStatusStyle(passation?.status)
+                      }}
+                    >
+                      {getStatusLabel(passation?.status)}
+                    </span>
+                  </div>
 
-                  return (
-                    <tr key={player.id} style={{ borderTop: '1px solid #e2e8f4' }}>
-                      <td style={tdStyle}>
-                        <div style={{ fontWeight: 800, color: '#16233b' }}>
-                          {getFullName(player)}
-                        </div>
-                        <div style={{ marginTop: 6, fontSize: 13, color: '#667085' }}>
-                          créé le {formatDate(player.created_at)}
-                        </div>
-                      </td>
+                  <div style={infoGridStyle}>
+                    <InfoBox label="Email" value={player.email || '—'} />
+                    <InfoBox label="Module" value={passation?.module || '—'} />
+                    <InfoBox
+                      label="Réponse"
+                      value={hasResult ? 'Oui' : 'Non'}
+                      tone={hasResult ? 'success' : 'neutral'}
+                    />
+                    <InfoBox
+                      label="Score"
+                      value={
+                        typeof result?.score_global === 'number'
+                          ? `${result.score_global}/100`
+                          : '—'
+                      }
+                      strong
+                    />
+                  </div>
 
-                      <td style={tdStyle}>{player.email || '—'}</td>
+                  <div style={profileWrapStyle}>
+                    <div style={profileLabelTitleStyle}>Profil</div>
+                    <div style={profilePillStyle}>
+                      {result?.profile_label || 'Rapport non disponible'}
+                    </div>
+                  </div>
 
-                      <td style={tdStyle}>{passation?.module || '—'}</td>
+                  <div style={tokenBoxStyle}>
+                    <div style={tokenTitleStyle}>Token de passation</div>
+                    <div style={tokenValueStyle}>{passation?.token || '—'}</div>
+                  </div>
 
-                      <td style={tdStyle}>
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            padding: '8px 12px',
-                            borderRadius: 999,
-                            fontWeight: 800,
-                            ...statusStyles
-                          }}
-                        >
-                          {getStatusLabel(passation?.status)}
-                        </span>
-                      </td>
+                  <div style={datesGridStyle}>
+                    <InfoBox label="Date passation" value={formatDate(passation?.created_at || null)} />
+                    <InfoBox label="Date réponse" value={formatDate(result?.created_at || null)} />
+                  </div>
 
-                      <td style={tdStyle}>
-                        <div
-                          style={{
-                            fontFamily: 'monospace',
-                            fontSize: 13,
-                            color: '#52607d',
-                            wordBreak: 'break-all',
-                            maxWidth: 180
-                          }}
-                        >
-                          {passation?.token || '—'}
-                        </div>
-                      </td>
+                  <div style={cardActionsStyle}>
+                    {passationLink ? (
+                      <Link href={passationLink} style={secondaryButtonStyle}>
+                        Ouvrir passation
+                      </Link>
+                    ) : (
+                      <span style={disabledButtonStyle}>Passation indisponible</span>
+                    )}
 
-                      <td style={tdStyle}>
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            padding: '8px 12px',
-                            borderRadius: 999,
-                            fontWeight: 800,
-                            background: hasResult ? '#ecfdf3' : '#f8fafd',
-                            color: hasResult ? '#067647' : '#667085',
-                            border: hasResult
-                              ? '1px solid #abefc6'
-                              : '1px solid #d5ddea'
-                          }}
-                        >
-                          {hasResult ? 'Oui' : 'Non'}
-                        </span>
-                      </td>
-
-                      <td style={tdStyle}>
-                        <div style={{ fontWeight: 900, color: '#223461', fontSize: 24 }}>
-                          {typeof result?.score_global === 'number' ? result.score_global : '—'}
-                        </div>
-                      </td>
-
-                      <td style={tdStyle}>
-                        <div
-                          style={{
-                            display: 'inline-flex',
-                            padding: '10px 14px',
-                            borderRadius: 999,
-                            background: result?.profile_label ? '#eef2ff' : '#f8fafd',
-                            color: result?.profile_label ? '#34518b' : '#667085',
-                            fontWeight: 800,
-                            border: result?.profile_label
-                              ? 'none'
-                              : '1px solid #d5ddea',
-                            maxWidth: 320
-                          }}
-                        >
-                          {result?.profile_label || '—'}
-                        </div>
-                      </td>
-
-                      <td style={tdStyle}>{formatDate(result?.created_at || null)}</td>
-
-                      <td style={tdStyle}>
-                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                          {passationLink ? (
-                            <Link href={passationLink} style={smallLinkButtonStyle}>
-                              Ouvrir passation
-                            </Link>
-                          ) : null}
-
-                          {reportLink ? (
-                            <a
-                              href={reportLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={smallPrimaryButtonStyle}
-                            >
-                              Voir rapport
-                            </a>
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                    {reportLink && hasResult ? (
+                      <a
+                        href={reportLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={primaryButtonStyle}
+                      >
+                        Voir rapport individuel
+                      </a>
+                    ) : (
+                      <span style={disabledButtonStyle}>Rapport non disponible</span>
+                    )}
+                  </div>
+                </article>
+              )
+            })}
           </div>
         )}
       </section>
     </main>
   )
+}
+
+function InfoBox({
+  label,
+  value,
+  strong = false,
+  tone = 'neutral'
+}: {
+  label: string
+  value: string
+  strong?: boolean
+  tone?: 'neutral' | 'success'
+}) {
+  const toneStyles =
+    tone === 'success'
+      ? {
+          background: '#ecfdf3',
+          border: '1px solid #abefc6',
+          color: '#067647'
+        }
+      : {
+          background: '#f8fafd',
+          border: '1px solid #dce4f1',
+          color: '#1e2b45'
+        }
+
+  return (
+    <div
+      style={{
+        ...infoBoxStyle,
+        ...toneStyles
+      }}
+    >
+      <div style={infoBoxLabelStyle}>{label}</div>
+      <div
+        style={{
+          ...infoBoxValueStyle,
+          fontWeight: strong ? 900 : 700
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  )
+}
+
+const pageStyle: CSSProperties = {
+  maxWidth: 1440,
+  margin: '0 auto',
+  padding: 24,
+  display: 'grid',
+  gap: 24
+}
+
+const heroCardStyle: CSSProperties = {
+  background: '#fff',
+  borderRadius: 28,
+  padding: 28,
+  boxShadow: '0 14px 40px rgba(21,37,69,0.08)',
+  display: 'grid',
+  gap: 18
+}
+
+const sectionCardStyle: CSSProperties = {
+  background: '#fff',
+  borderRadius: 28,
+  boxShadow: '0 14px 40px rgba(21,37,69,0.08)',
+  overflow: 'hidden'
+}
+
+const sectionHeaderStyle: CSSProperties = {
+  padding: 24,
+  borderBottom: '1px solid #e2e8f4'
+}
+
+const eyebrowStyle: CSSProperties = {
+  fontSize: 13,
+  fontWeight: 800,
+  letterSpacing: '0.16em',
+  textTransform: 'uppercase',
+  color: '#6f7f9d'
+}
+
+const titleStyle: CSSProperties = {
+  margin: 0,
+  fontSize: 42,
+  lineHeight: 1,
+  color: '#16233b'
+}
+
+const heroTitleStyle: CSSProperties = {
+  margin: 0,
+  fontSize: 56,
+  lineHeight: 1,
+  color: '#16233b',
+  wordBreak: 'break-word'
+}
+
+const sectionTitleStyle: CSSProperties = {
+  margin: 0,
+  fontSize: 44,
+  lineHeight: 1,
+  color: '#16233b'
+}
+
+const leadStyle: CSSProperties = {
+  margin: 0,
+  fontSize: 18,
+  lineHeight: 1.8,
+  color: '#5f6f8e',
+  maxWidth: 980
+}
+
+const pillWrapStyle: CSSProperties = {
+  display: 'flex',
+  gap: 10,
+  flexWrap: 'wrap'
 }
 
 const pillStyle: CSSProperties = {
@@ -734,17 +573,10 @@ const pillStyle: CSSProperties = {
   fontWeight: 700
 }
 
-const linkButtonStyle: CSSProperties = {
-  textDecoration: 'none',
-  padding: '14px 18px',
-  borderRadius: 16,
-  border: '1px solid #d5ddea',
-  color: '#173A73',
-  background: '#fff',
-  fontWeight: 700,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center'
+const actionsWrapStyle: CSSProperties = {
+  display: 'flex',
+  gap: 12,
+  flexWrap: 'wrap'
 }
 
 const primaryButtonStyle: CSSProperties = {
@@ -754,76 +586,218 @@ const primaryButtonStyle: CSSProperties = {
   border: 'none',
   color: '#fff',
   background: 'linear-gradient(135deg, #2f4d85 0%, #395da0 100%)',
-  fontWeight: 700,
+  fontWeight: 800,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
   boxShadow: '0 8px 22px rgba(47, 77, 133, 0.22)'
 }
 
-const smallLinkButtonStyle: CSSProperties = {
+const secondaryButtonStyle: CSSProperties = {
   textDecoration: 'none',
-  padding: '10px 12px',
-  borderRadius: 12,
+  padding: '14px 18px',
+  borderRadius: 16,
   border: '1px solid #d5ddea',
   color: '#173A73',
   background: '#fff',
-  fontWeight: 700,
-  fontSize: 14,
+  fontWeight: 800,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center'
 }
 
-const smallPrimaryButtonStyle: CSSProperties = {
-  textDecoration: 'none',
-  padding: '10px 12px',
-  borderRadius: 12,
-  border: 'none',
-  color: '#fff',
-  background: 'linear-gradient(135deg, #2f4d85 0%, #395da0 100%)',
-  fontWeight: 700,
-  fontSize: 14,
+const disabledButtonStyle: CSSProperties = {
+  padding: '14px 18px',
+  borderRadius: 16,
+  border: '1px solid #d5ddea',
+  color: '#98a2b3',
+  background: '#f8fafd',
+  fontWeight: 800,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center'
 }
 
-const miniCardStyle: CSSProperties = {
-  padding: 18,
-  borderRadius: 18,
-  border: '1px solid #dce4f1',
-  background: '#f8fafd'
+const statsGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+  gap: 18
 }
 
-const miniCardValueStyle: CSSProperties = {
-  fontSize: 36,
+const statCardStyle: CSSProperties = {
+  background: '#fff',
+  borderRadius: 24,
+  padding: 24,
+  boxShadow: '0 14px 40px rgba(21,37,69,0.08)'
+}
+
+const statValueStyle: CSSProperties = {
+  fontSize: 58,
+  lineHeight: 1,
   fontWeight: 900,
   color: '#223461',
-  lineHeight: 1,
-  marginBottom: 8,
+  marginBottom: 14,
   wordBreak: 'break-word'
 }
 
-const miniCardLabelStyle: CSSProperties = {
-  fontSize: 17,
+const statLabelStyle: CSSProperties = {
+  fontSize: 19,
+  lineHeight: 1.35,
   fontWeight: 700,
   color: '#667085'
 }
 
-const thStyle: CSSProperties = {
-  textAlign: 'left',
-  padding: '20px 18px',
-  fontSize: 14,
-  letterSpacing: '0.12em',
-  textTransform: 'uppercase',
-  color: '#667085',
-  fontWeight: 900
+const progressHeadStyle: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  fontWeight: 800,
+  color: '#223461',
+  marginBottom: 8,
+  fontSize: 18
 }
 
-const tdStyle: CSSProperties = {
-  padding: '20px 18px',
-  verticalAlign: 'top',
+const progressTrackStyle: CSSProperties = {
+  height: 18,
+  borderRadius: 999,
+  background: '#e8edf7',
+  overflow: 'hidden'
+}
+
+const progressFillStyle: CSSProperties = {
+  height: '100%',
+  background: 'linear-gradient(90deg, #2f4d85 0%, #7896dd 100%)'
+}
+
+const playerCardsWrapStyle: CSSProperties = {
+  padding: 24,
+  display: 'grid',
+  gap: 18
+}
+
+const playerCardStyle: CSSProperties = {
+  border: '1px solid #e2e8f4',
+  borderRadius: 24,
+  background: '#fbfcff',
+  padding: 20,
+  display: 'grid',
+  gap: 18
+}
+
+const playerTopRowStyle: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  gap: 12,
+  alignItems: 'flex-start',
+  flexWrap: 'wrap'
+}
+
+const playerNameStyle: CSSProperties = {
+  fontSize: 30,
+  fontWeight: 900,
+  color: '#16233b',
+  lineHeight: 1.1
+}
+
+const playerMetaStyle: CSSProperties = {
+  marginTop: 6,
+  fontSize: 14,
+  color: '#667085'
+}
+
+const statusPillStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  padding: '8px 12px',
+  borderRadius: 999,
+  fontWeight: 800
+}
+
+const infoGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+  gap: 12
+}
+
+const infoBoxStyle: CSSProperties = {
+  borderRadius: 18,
+  padding: 14
+}
+
+const infoBoxLabelStyle: CSSProperties = {
+  fontSize: 13,
+  fontWeight: 800,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+  color: '#6f7f9d',
+  marginBottom: 8
+}
+
+const infoBoxValueStyle: CSSProperties = {
+  fontSize: 18,
+  color: '#1e2b45',
+  lineHeight: 1.4,
+  wordBreak: 'break-word'
+}
+
+const profileWrapStyle: CSSProperties = {
+  display: 'grid',
+  gap: 8
+}
+
+const profileLabelTitleStyle: CSSProperties = {
+  fontSize: 13,
+  fontWeight: 800,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+  color: '#6f7f9d'
+}
+
+const profilePillStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  width: 'fit-content',
+  maxWidth: '100%',
+  padding: '12px 16px',
+  borderRadius: 999,
+  background: '#eef2ff',
+  color: '#34518b',
+  fontWeight: 800,
   fontSize: 16,
-  color: '#1e2b45'
+  lineHeight: 1.4,
+  wordBreak: 'break-word'
+}
+
+const tokenBoxStyle: CSSProperties = {
+  background: '#0c244b',
+  color: '#eef4ff',
+  borderRadius: 18,
+  padding: 16
+}
+
+const tokenTitleStyle: CSSProperties = {
+  fontSize: 13,
+  fontWeight: 800,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+  color: '#cbd8ff',
+  marginBottom: 8
+}
+
+const tokenValueStyle: CSSProperties = {
+  fontFamily: 'monospace',
+  fontSize: 14,
+  lineHeight: 1.7,
+  wordBreak: 'break-all'
+}
+
+const datesGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+  gap: 12
+}
+
+const cardActionsStyle: CSSProperties = {
+  display: 'flex',
+  gap: 12,
+  flexWrap: 'wrap'
 }
