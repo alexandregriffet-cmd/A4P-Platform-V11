@@ -75,7 +75,11 @@ function formatDate(value?: string | null) {
 }
 
 function getFullName(player: { firstname?: string | null; lastname?: string | null }) {
-  const fullName = [player.firstname || '', player.lastname || ''].filter(Boolean).join(' ').trim()
+  const fullName = [player.firstname || '', player.lastname || '']
+    .filter(Boolean)
+    .join(' ')
+    .trim()
+
   return fullName || 'Sans nom'
 }
 
@@ -95,6 +99,7 @@ function getStatusStyle(status?: string | null): CSSProperties {
       border: '1px solid #abefc6'
     }
   }
+
   if (status === 'in_progress') {
     return {
       background: '#eff8ff',
@@ -102,6 +107,7 @@ function getStatusStyle(status?: string | null): CSSProperties {
       border: '1px solid #b2ddff'
     }
   }
+
   if (status === 'sent') {
     return {
       background: '#f5f8ff',
@@ -109,6 +115,7 @@ function getStatusStyle(status?: string | null): CSSProperties {
       border: '1px solid #c7d7fe'
     }
   }
+
   return {
     background: '#f8fafd',
     color: '#667085',
@@ -134,18 +141,20 @@ function StatCard({
     >
       <div
         style={{
-          fontSize: 58,
+          fontSize: 56,
           lineHeight: 1,
           fontWeight: 900,
           color: '#223461',
-          marginBottom: 14
+          marginBottom: 12,
+          wordBreak: 'break-word'
         }}
       >
         {value}
       </div>
+
       <div
         style={{
-          fontSize: 19,
+          fontSize: 18,
           lineHeight: 1.35,
           fontWeight: 700,
           color: '#667085'
@@ -178,10 +187,14 @@ export default async function TeamDashboardPage({ params }: PageProps) {
             boxShadow: '0 14px 40px rgba(21,37,69,0.08)'
           }}
         >
-          <h1 style={{ marginTop: 0, fontSize: 42, color: '#16233b' }}>Équipe introuvable</h1>
+          <h1 style={{ marginTop: 0, fontSize: 42, color: '#16233b' }}>
+            Équipe introuvable
+          </h1>
+
           <p style={{ fontSize: 20, lineHeight: 1.7, color: '#5f6f8e' }}>
             Je n’ai pas trouvé cette équipe dans la base V11.
           </p>
+
           <Link href="/club" style={linkButtonStyle}>
             Retour club
           </Link>
@@ -237,12 +250,16 @@ export default async function TeamDashboardPage({ params }: PageProps) {
   })
 
   const teamName = team.team_name || team.name || 'Équipe'
+
   const totalPlayers = players.length
   const totalPassations = passations.length
-  const completedCount = passations.filter((item) => item.status === 'completed').length
-  const pendingCount = passations.filter((item) => item.status === 'pending').length
-  const inProgressCount = passations.filter((item) => item.status === 'in_progress').length
-  const sentCount = passations.filter((item) => item.status === 'sent').length
+
+  const completedPassations = passations.filter((item) => item.status === 'completed')
+  const pendingPassations = passations.filter((item) => item.status === 'pending')
+  const inProgressPassations = passations.filter((item) => item.status === 'in_progress')
+  const sentPassations = passations.filter((item) => item.status === 'sent')
+
+  const responseCount = cmpResults.length
 
   const scores = cmpResults
     .map((item) => item.score_global)
@@ -253,8 +270,21 @@ export default async function TeamDashboardPage({ params }: PageProps) {
       ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)
       : 0
 
-  const latestPassationDate =
-    passations.length > 0 ? formatDate(passations[0]?.created_at || null) : '—'
+  const completionPercent =
+    totalPassations > 0 ? Math.round((completedPassations.length / totalPassations) * 100) : 0
+
+  const latestResultDate =
+    cmpResults.length > 0
+      ? formatDate(
+          cmpResults
+            .slice()
+            .sort((a, b) => {
+              const da = a.created_at ? new Date(a.created_at).getTime() : 0
+              const db = b.created_at ? new Date(b.created_at).getTime() : 0
+              return db - da
+            })[0]?.created_at || null
+        )
+      : '—'
 
   return (
     <main style={{ maxWidth: 1440, margin: '0 auto', padding: 24 }}>
@@ -339,8 +369,8 @@ export default async function TeamDashboardPage({ params }: PageProps) {
             maxWidth: 980
           }}
         >
-          Cette page centralise automatiquement les joueurs, les passations, la progression
-          et l’accès direct aux rapports. C’est le tableau de pilotage de l’équipe.
+          Cette page centralise automatiquement les joueurs, les passations, les réponses
+          CMP, la progression de complétion et l’accès direct aux rapports individuels.
         </div>
       </section>
 
@@ -354,7 +384,7 @@ export default async function TeamDashboardPage({ params }: PageProps) {
       >
         <StatCard value={totalPlayers} label="joueurs" />
         <StatCard value={totalPassations} label="passations" />
-        <StatCard value={completedCount} label="tests terminés" />
+        <StatCard value={responseCount} label="réponses CMP" />
         <StatCard value={averageScore} label="score moyen CMP" />
       </section>
 
@@ -366,10 +396,10 @@ export default async function TeamDashboardPage({ params }: PageProps) {
           marginBottom: 24
         }}
       >
-        <StatCard value={pendingCount} label="à faire" />
-        <StatCard value={sentCount} label="envoyées" />
-        <StatCard value={inProgressCount} label="en cours" />
-        <StatCard value={latestPassationDate} label="dernière passation" />
+        <StatCard value={pendingPassations.length} label="pending" />
+        <StatCard value={sentPassations.length} label="sent" />
+        <StatCard value={inProgressPassations.length} label="in progress" />
+        <StatCard value={completedPassations.length} label="completed" />
       </section>
 
       <section
@@ -417,9 +447,7 @@ export default async function TeamDashboardPage({ params }: PageProps) {
               }}
             >
               <span>Complétion globale</span>
-              <span>
-                {totalPassations > 0 ? Math.round((completedCount / totalPassations) * 100) : 0}%
-              </span>
+              <span>{completionPercent}%</span>
             </div>
 
             <div
@@ -432,13 +460,67 @@ export default async function TeamDashboardPage({ params }: PageProps) {
             >
               <div
                 style={{
-                  width: `${
-                    totalPassations > 0 ? Math.round((completedCount / totalPassations) * 100) : 0
-                  }%`,
+                  width: `${completionPercent}%`,
                   height: '100%',
                   background: 'linear-gradient(90deg, #2f4d85 0%, #7896dd 100%)'
                 }}
               />
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: 14
+            }}
+          >
+            <div style={miniCardStyle}>
+              <div style={miniCardValueStyle}>{completedPassations.length}</div>
+              <div style={miniCardLabelStyle}>Terminées</div>
+            </div>
+
+            <div style={miniCardStyle}>
+              <div style={miniCardValueStyle}>{inProgressPassations.length}</div>
+              <div style={miniCardLabelStyle}>En cours</div>
+            </div>
+
+            <div style={miniCardStyle}>
+              <div style={miniCardValueStyle}>{sentPassations.length}</div>
+              <div style={miniCardLabelStyle}>Envoyées</div>
+            </div>
+
+            <div style={miniCardStyle}>
+              <div style={miniCardValueStyle}>{pendingPassations.length}</div>
+              <div style={miniCardLabelStyle}>À faire</div>
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: 14
+            }}
+          >
+            <div style={miniCardStyle}>
+              <div style={miniCardValueStyle}>{responseCount}</div>
+              <div style={miniCardLabelStyle}>Réponses enregistrées</div>
+            </div>
+
+            <div style={miniCardStyle}>
+              <div style={miniCardValueStyle}>{averageScore}</div>
+              <div style={miniCardLabelStyle}>Score moyen</div>
+            </div>
+
+            <div style={miniCardStyle}>
+              <div style={miniCardValueStyle}>{latestResultDate}</div>
+              <div style={miniCardLabelStyle}>Dernière réponse</div>
+            </div>
+
+            <div style={miniCardStyle}>
+              <div style={miniCardValueStyle}>{teamName}</div>
+              <div style={miniCardLabelStyle}>Équipe</div>
             </div>
           </div>
         </div>
@@ -480,7 +562,7 @@ export default async function TeamDashboardPage({ params }: PageProps) {
               style={{
                 width: '100%',
                 borderCollapse: 'collapse',
-                minWidth: 1200
+                minWidth: 1320
               }}
             >
               <thead>
@@ -490,19 +572,30 @@ export default async function TeamDashboardPage({ params }: PageProps) {
                   <th style={thStyle}>Module</th>
                   <th style={thStyle}>Statut</th>
                   <th style={thStyle}>Token</th>
+                  <th style={thStyle}>Réponse</th>
                   <th style={thStyle}>Score</th>
                   <th style={thStyle}>Profil</th>
+                  <th style={thStyle}>Date réponse</th>
                   <th style={thStyle}>Actions</th>
                 </tr>
               </thead>
+
               <tbody>
                 {players.map((player) => {
                   const passation = passationsByPlayerId.get(player.id)
                   const result = passation?.token ? resultsByToken.get(passation.token) : undefined
                   const statusStyles = getStatusStyle(passation?.status)
 
+                  const hasResult = Boolean(result)
+
                   const passationLink = passation?.token
                     ? `/passations/${passation.token}`
+                    : null
+
+                  const reportLink = passation?.token
+                    ? `https://alexandregriffet-cmd.github.io/CMP-A4P-ACADEMIE-DE-PERFORMANCES-/resultats.html?token=${encodeURIComponent(
+                        passation.token
+                      )}`
                     : null
 
                   return (
@@ -511,9 +604,13 @@ export default async function TeamDashboardPage({ params }: PageProps) {
                         <div style={{ fontWeight: 800, color: '#16233b' }}>
                           {getFullName(player)}
                         </div>
+                        <div style={{ marginTop: 6, fontSize: 13, color: '#667085' }}>
+                          créé le {formatDate(player.created_at)}
+                        </div>
                       </td>
 
                       <td style={tdStyle}>{player.email || '—'}</td>
+
                       <td style={tdStyle}>{passation?.module || '—'}</td>
 
                       <td style={tdStyle}>
@@ -546,6 +643,24 @@ export default async function TeamDashboardPage({ params }: PageProps) {
                       </td>
 
                       <td style={tdStyle}>
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            padding: '8px 12px',
+                            borderRadius: 999,
+                            fontWeight: 800,
+                            background: hasResult ? '#ecfdf3' : '#f8fafd',
+                            color: hasResult ? '#067647' : '#667085',
+                            border: hasResult
+                              ? '1px solid #abefc6'
+                              : '1px solid #d5ddea'
+                          }}
+                        >
+                          {hasResult ? 'Oui' : 'Non'}
+                        </span>
+                      </td>
+
+                      <td style={tdStyle}>
                         <div style={{ fontWeight: 900, color: '#223461', fontSize: 24 }}>
                           {typeof result?.score_global === 'number' ? result.score_global : '—'}
                         </div>
@@ -557,15 +672,20 @@ export default async function TeamDashboardPage({ params }: PageProps) {
                             display: 'inline-flex',
                             padding: '10px 14px',
                             borderRadius: 999,
-                            background: '#eef2ff',
-                            color: '#34518b',
+                            background: result?.profile_label ? '#eef2ff' : '#f8fafd',
+                            color: result?.profile_label ? '#34518b' : '#667085',
                             fontWeight: 800,
+                            border: result?.profile_label
+                              ? 'none'
+                              : '1px solid #d5ddea',
                             maxWidth: 320
                           }}
                         >
                           {result?.profile_label || '—'}
                         </div>
                       </td>
+
+                      <td style={tdStyle}>{formatDate(result?.created_at || null)}</td>
 
                       <td style={tdStyle}>
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -575,11 +695,9 @@ export default async function TeamDashboardPage({ params }: PageProps) {
                             </Link>
                           ) : null}
 
-                          {passation?.token ? (
+                          {reportLink ? (
                             <a
-                              href={`https://alexandregriffet-cmd.github.io/CMP-A4P-ACADEMIE-DE-PERFORMANCES-/resultats.html?token=${encodeURIComponent(
-                                passation.token
-                              )}`}
+                              href={reportLink}
                               target="_blank"
                               rel="noopener noreferrer"
                               style={smallPrimaryButtonStyle}
@@ -673,6 +791,21 @@ const miniCardStyle: CSSProperties = {
   background: '#f8fafd'
 }
 
+const miniCardValueStyle: CSSProperties = {
+  fontSize: 36,
+  fontWeight: 900,
+  color: '#223461',
+  lineHeight: 1,
+  marginBottom: 8,
+  wordBreak: 'break-word'
+}
+
+const miniCardLabelStyle: CSSProperties = {
+  fontSize: 17,
+  fontWeight: 700,
+  color: '#667085'
+}
+
 const thStyle: CSSProperties = {
   textAlign: 'left',
   padding: '20px 18px',
@@ -689,34 +822,3 @@ const tdStyle: CSSProperties = {
   fontSize: 16,
   color: '#1e2b45'
 }
-Here’s what I see from your screenshots and code:
-
-1. The individual CMP test is still storing and showing results locally / in your static GitHub result page.  
-2. The V11 dashboard page under `/club/equipes/[teamId]` is **not** finding any linked results, which is why it shows:
-   - `Score moyen CMP : 0/100`
-   - `Réponses : 0`
-3. The reason is **data linkage**, not rendering.
-
-### Why it’s happening
-Your dashboard page is looking up results like this:
-
-- get `players` where `team_id = teamId`
-- get `passations` where `team_id = teamId`
-- take the `token`s from those passations
-- look in `cmp_results` for rows with those same `token`s
-
-That is the correct idea.
-
-But from the screenshots:
-- the CMP result page you showed is still using the GitHub/static report flow
-- the row in `cmp_results` is not necessarily being written with the **same token** as the passation you are opening
-- or the passation link you used is not the one tied to this team
-- or the CMP result is not written at all for that token in `cmp_results`
-
-### What your screenshots strongly suggest
-The team dashboard is functioning technically, but it does **not yet have a successful match** between:
-
-```text
-passations.token
-=
-cmp_results.token
