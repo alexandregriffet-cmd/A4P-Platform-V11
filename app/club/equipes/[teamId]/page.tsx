@@ -169,7 +169,7 @@ export default async function TeamDashboardPage({ params }: PageProps) {
 
   if (teamError || !team) {
     return (
-      <main style={{ maxWidth: 1200, margin: '0 auto', padding: 24 }}>
+      <main style={{ maxWidth: 1440, margin: '0 auto', padding: 24 }}>
         <div
           style={{
             background: '#fff',
@@ -251,7 +251,7 @@ export default async function TeamDashboardPage({ params }: PageProps) {
   const averageScore =
     scores.length > 0
       ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)
-      : '—'
+      : 0
 
   const latestPassationDate =
     passations.length > 0 ? formatDate(passations[0]?.created_at || null) : '—'
@@ -441,34 +441,6 @@ export default async function TeamDashboardPage({ params }: PageProps) {
               />
             </div>
           </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-              gap: 14
-            }}
-          >
-            <div style={miniCardStyle}>
-              <div style={miniCardValueStyle}>{completedCount}</div>
-              <div style={miniCardLabelStyle}>Terminées</div>
-            </div>
-
-            <div style={miniCardStyle}>
-              <div style={miniCardValueStyle}>{inProgressCount}</div>
-              <div style={miniCardLabelStyle}>En cours</div>
-            </div>
-
-            <div style={miniCardStyle}>
-              <div style={miniCardValueStyle}>{sentCount}</div>
-              <div style={miniCardLabelStyle}>Envoyées</div>
-            </div>
-
-            <div style={miniCardStyle}>
-              <div style={miniCardValueStyle}>{pendingCount}</div>
-              <div style={miniCardLabelStyle}>À faire</div>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -515,7 +487,6 @@ export default async function TeamDashboardPage({ params }: PageProps) {
                 <tr style={{ background: '#f8fafd' }}>
                   <th style={thStyle}>Joueur</th>
                   <th style={thStyle}>Email</th>
-                  <th style={thStyle}>Poste</th>
                   <th style={thStyle}>Module</th>
                   <th style={thStyle}>Statut</th>
                   <th style={thStyle}>Token</th>
@@ -528,17 +499,10 @@ export default async function TeamDashboardPage({ params }: PageProps) {
                 {players.map((player) => {
                   const passation = passationsByPlayerId.get(player.id)
                   const result = passation?.token ? resultsByToken.get(passation.token) : undefined
-
                   const statusStyles = getStatusStyle(passation?.status)
 
                   const passationLink = passation?.token
                     ? `/passations/${passation.token}`
-                    : null
-
-                  const cmpReportLink = passation?.token
-                    ? `https://alexandregriffet-cmd.github.io/CMP-A4P-ACADEMIE-DE-PERFORMANCES-/resultats.html?token=${encodeURIComponent(
-                        passation.token
-                      )}`
                     : null
 
                   return (
@@ -547,13 +511,9 @@ export default async function TeamDashboardPage({ params }: PageProps) {
                         <div style={{ fontWeight: 800, color: '#16233b' }}>
                           {getFullName(player)}
                         </div>
-                        <div style={{ marginTop: 6, fontSize: 13, color: '#667085' }}>
-                          créé le {formatDate(player.created_at)}
-                        </div>
                       </td>
 
                       <td style={tdStyle}>{player.email || '—'}</td>
-                      <td style={tdStyle}>{player.position || '—'}</td>
                       <td style={tdStyle}>{passation?.module || '—'}</td>
 
                       <td style={tdStyle}>
@@ -615,9 +575,11 @@ export default async function TeamDashboardPage({ params }: PageProps) {
                             </Link>
                           ) : null}
 
-                          {cmpReportLink ? (
+                          {passation?.token ? (
                             <a
-                              href={cmpReportLink}
+                              href={`https://alexandregriffet-cmd.github.io/CMP-A4P-ACADEMIE-DE-PERFORMANCES-/resultats.html?token=${encodeURIComponent(
+                                passation.token
+                              )}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               style={smallPrimaryButtonStyle}
@@ -711,20 +673,6 @@ const miniCardStyle: CSSProperties = {
   background: '#f8fafd'
 }
 
-const miniCardValueStyle: CSSProperties = {
-  fontSize: 36,
-  fontWeight: 900,
-  color: '#223461',
-  lineHeight: 1,
-  marginBottom: 8
-}
-
-const miniCardLabelStyle: CSSProperties = {
-  fontSize: 17,
-  fontWeight: 700,
-  color: '#667085'
-}
-
 const thStyle: CSSProperties = {
   textAlign: 'left',
   padding: '20px 18px',
@@ -741,3 +689,34 @@ const tdStyle: CSSProperties = {
   fontSize: 16,
   color: '#1e2b45'
 }
+Here’s what I see from your screenshots and code:
+
+1. The individual CMP test is still storing and showing results locally / in your static GitHub result page.  
+2. The V11 dashboard page under `/club/equipes/[teamId]` is **not** finding any linked results, which is why it shows:
+   - `Score moyen CMP : 0/100`
+   - `Réponses : 0`
+3. The reason is **data linkage**, not rendering.
+
+### Why it’s happening
+Your dashboard page is looking up results like this:
+
+- get `players` where `team_id = teamId`
+- get `passations` where `team_id = teamId`
+- take the `token`s from those passations
+- look in `cmp_results` for rows with those same `token`s
+
+That is the correct idea.
+
+But from the screenshots:
+- the CMP result page you showed is still using the GitHub/static report flow
+- the row in `cmp_results` is not necessarily being written with the **same token** as the passation you are opening
+- or the passation link you used is not the one tied to this team
+- or the CMP result is not written at all for that token in `cmp_results`
+
+### What your screenshots strongly suggest
+The team dashboard is functioning technically, but it does **not yet have a successful match** between:
+
+```text
+passations.token
+=
+cmp_results.token
