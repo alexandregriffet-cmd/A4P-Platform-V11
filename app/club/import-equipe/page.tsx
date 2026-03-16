@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type CSSProperties, type FormEvent } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -20,6 +20,48 @@ type CreatedPassation = {
   link: string
 }
 
+type TeamInsertRow = {
+  club_id: string | null
+  name: string
+  team_name: string
+  season: string | null
+}
+
+type PlayerInsertRow = {
+  team_id: string
+  firstname: string
+  lastname: string
+  email: string | null
+  position: null
+}
+
+type PassationInsertRow = {
+  player_id: string
+  team_id: string
+  club_id: string | null
+  module: string
+  token: string
+  status: string
+}
+
+type TeamCreatedRow = {
+  id: string
+  team_name?: string | null
+}
+
+type PlayerCreatedRow = {
+  id: string
+  firstname: string | null
+  lastname: string | null
+  email: string | null
+}
+
+type PassationCreatedRow = {
+  player_id: string
+  token: string
+  module: string | null
+}
+
 function makeToken(length = 20): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
   let token = ''
@@ -33,10 +75,6 @@ function parsePlayerLine(line: string): ImportedPlayer | null {
   const cleaned = line.trim()
   if (!cleaned) return null
 
-  // Formats acceptés :
-  // 1) Prénom Nom
-  // 2) Prénom Nom ; email@domaine.fr
-  // 3) Prénom Nom, email@domaine.fr
   let identityPart = cleaned
   let emailPart = ''
 
@@ -54,7 +92,7 @@ function parsePlayerLine(line: string): ImportedPlayer | null {
 
   const identityTokens = identityPart
     .split(/\s+/)
-    .map((p) => p.trim())
+    .map((part) => part.trim())
     .filter(Boolean)
 
   if (!identityTokens.length) return null
@@ -86,10 +124,10 @@ export default function ImportEquipePage() {
     return playersText
       .split('\n')
       .map(parsePlayerLine)
-      .filter((p): p is ImportedPlayer => Boolean(p))
+      .filter((player): player is ImportedPlayer => player !== null)
   }, [playersText])
 
-  async function handleImport(e: React.FormEvent) {
+  async function handleImport(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setLoading(true)
     setResultMessage('')
@@ -106,27 +144,27 @@ export default function ImportEquipePage() {
         throw new Error('Ajoute au moins un joueur dans la liste.')
       }
 
-      // 1. Créer l’équipe
+      const teamPayload: TeamInsertRow = {
+        club_id: clubId.trim() || null,
+        name: teamName.trim(),
+        team_name: teamName.trim(),
+        season: season.trim() || null
+      }
+
       const { data: teamData, error: teamError } = await supabase
         .from('teams')
-        .insert({
-          club_id: clubId.trim() || null,
-          name: teamName.trim(),
-          team_name: teamName.trim(),
-          season: season.trim() || null
-        })
+        .insert(teamPayload)
         .select('id, team_name')
-        .single()
+        .single<TeamCreatedRow>()
 
       if (teamError || !teamData?.id) {
         throw new Error(teamError?.message || "Impossible de créer l'équipe.")
       }
 
-      const teamId = teamData.id as string
+      const teamId = teamData.id
       setCreatedTeamId(teamId)
 
-      // 2. Créer les joueurs
-      const playersPayload = parsedPlayers.map((player) => ({
+      const playersPayload: PlayerInsertRow[] = parsedPlayers.map((player) => ({
         team_id: teamId,
         firstname: player.firstname,
         lastname: player.lastname,
@@ -138,13 +176,13 @@ export default function ImportEquipePage() {
         .from('players')
         .insert(playersPayload)
         .select('id, firstname, lastname, email')
+        .returns<PlayerCreatedRow[]>()
 
-      if (playersError || !playersCreated) {
+      if (playersError || !playersCreated || !playersCreated.length) {
         throw new Error(playersError?.message || 'Impossible de créer les joueurs.')
       }
 
-      // 3. Créer une passation par joueur
-      const passationsPayload = playersCreated.map((player) => ({
+      const passationsPayload: PassationInsertRow[] = playersCreated.map((player) => ({
         player_id: player.id,
         team_id: teamId,
         club_id: clubId.trim() || null,
@@ -157,15 +195,16 @@ export default function ImportEquipePage() {
         .from('passations')
         .insert(passationsPayload)
         .select('player_id, token, module')
+        .returns<PassationCreatedRow[]>()
 
-      if (passationsError || !passationsCreated) {
+      if (passationsError || !passationsCreated || !passationsCreated.length) {
         throw new Error(passationsError?.message || 'Impossible de créer les passations.')
       }
 
-      // 4. Construire les liens
       const links: CreatedPassation[] = playersCreated.map((player) => {
-        const passation = passationsCreated.find((p) => p.player_id === player.id)
+        const passation = passationsCreated.find((item) => item.player_id === player.id)
         const token = passation?.token || ''
+
         return {
           playerId: player.id,
           firstname: player.firstname || '',
@@ -180,8 +219,9 @@ export default function ImportEquipePage() {
       setResultMessage(
         `Import terminé : ${playersCreated.length} joueur(s) créés, ${passationsCreated.length} passation(s) générée(s).`
       )
-    } catch (error: any) {
-      setErrorMessage(error?.message || 'Erreur inconnue pendant l’import.')
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Erreur inconnue pendant l’import.'
+      setErrorMessage(message)
     } finally {
       setLoading(false)
     }
@@ -189,9 +229,11 @@ export default function ImportEquipePage() {
 
   async function copyAllLinks() {
     if (!createdLinks.length) return
+
     const text = createdLinks
       .map((item, index) => {
-        const fullName = [item.firstname, item.lastname].filter(Boolean).join(' ') || `Joueur ${index + 1}`
+        const fullName =
+          [item.firstname, item.lastname].filter(Boolean).join(' ') || `Joueur ${index + 1}`
         const email = item.email ? ` (${item.email})` : ''
         return `${fullName}${email}\n${item.link}`
       })
@@ -563,7 +605,8 @@ Hugo Petit, hugo@email.fr`}
                   }}
                 >
                   <div style={{ fontWeight: 800, color: '#16233b' }}>
-                    {[item.firstname, item.lastname].filter(Boolean).join(' ') || `Joueur ${index + 1}`}
+                    {[item.firstname, item.lastname].filter(Boolean).join(' ') ||
+                      `Joueur ${index + 1}`}
                   </div>
                   <div style={{ fontFamily: 'monospace', fontSize: 13, color: '#52607d' }}>
                     {item.token}
@@ -655,7 +698,7 @@ function StatLine({
   )
 }
 
-const inputStyle: React.CSSProperties = {
+const inputStyle: CSSProperties = {
   width: '100%',
   border: '1px solid #d7deea',
   borderRadius: 16,
@@ -667,7 +710,7 @@ const inputStyle: React.CSSProperties = {
   outline: 'none'
 }
 
-const buttonPrimary: React.CSSProperties = {
+const buttonPrimary: CSSProperties = {
   appearance: 'none',
   border: 'none',
   cursor: 'pointer',
@@ -684,7 +727,7 @@ const buttonPrimary: React.CSSProperties = {
   boxShadow: '0 8px 22px rgba(47, 77, 133, 0.22)'
 }
 
-const buttonSecondary: React.CSSProperties = {
+const buttonSecondary: CSSProperties = {
   appearance: 'none',
   border: '1px solid #cfd8e6',
   cursor: 'pointer',
