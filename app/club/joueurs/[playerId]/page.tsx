@@ -387,6 +387,7 @@ function RadarChart({ radar }: { radar: Radar | null }) {
       <div style={{ color: '#5f6f8e', fontWeight: 800 }}>Radar mental A4P</div>
     </div>
   )
+}
 function StatCard({
   value,
   label,
