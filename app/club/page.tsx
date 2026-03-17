@@ -15,10 +15,15 @@ export default function ClubPage() {
   useEffect(() => {
     const load = async () => {
       try {
+        console.log('SUPABASE URL:', process.env.NEXT_PUBLIC_SUPABASE_URL)
+
         const {
           data: { user },
           error: userError
         } = await supabase.auth.getUser()
+
+        console.log('AUTH USER:', user)
+        console.log('AUTH ERROR:', userError)
 
         if (userError || !user) {
           console.error('Erreur user', userError)
@@ -34,15 +39,15 @@ export default function ClubPage() {
           .eq('auth_user_id', user.id)
 
         console.log('PROFILE RESULT:', data)
+        console.log('PROFILE ERROR:', error)
 
         if (error) {
           console.error('Erreur profile', error)
         }
 
         if (data && data.length > 0) {
-          setProfile(data[0]) // ⚠️ plus de maybeSingle
+          setProfile(data[0])
         }
-
       } catch (err) {
         console.error('Erreur globale', err)
       }
@@ -67,6 +72,7 @@ export default function ClubPage() {
 
       <p>Utilisateur : {profile.firstname} {profile.lastname}</p>
       <p>Rôle : {profile.role}</p>
+      <p>Email : {profile.email}</p>
       <p>Club ID : {profile.club_id}</p>
       <p>Team ID : {profile.team_id}</p>
 
