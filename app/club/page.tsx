@@ -17,11 +17,8 @@ export default function ClubPage() {
     const load = async () => {
       try {
         const {
-          data: { user },
-          error
+          data: { user }
         } = await supabase.auth.getUser()
-
-        console.log('USER:', user)
 
         if (!user) {
           setUserState(null)
@@ -31,16 +28,10 @@ export default function ClubPage() {
 
         setUserState(user)
 
-        const { data, error: profileError } = await supabase
+        const { data } = await supabase
           .from('club_users')
           .select('*')
           .eq('auth_user_id', user.id)
-
-        console.log('PROFILE:', data)
-
-        if (profileError) {
-          console.error(profileError)
-        }
 
         if (data && data.length > 0) {
           setProfile(data[0])
@@ -55,10 +46,8 @@ export default function ClubPage() {
     load()
   }, [])
 
-  // LOADING
   if (loading) return <div>Chargement...</div>
 
-  // PAS CONNECTÉ
   if (!userState) {
     return (
       <div style={{ padding: 20 }}>
@@ -70,9 +59,9 @@ export default function ClubPage() {
             if (!email) return
 
             await supabase.auth.signInWithOtp({
-              email: email,
+              email,
               options: {
-                emailRedirectTo: window.location.origin + '/club'
+                emailRedirectTo: 'https://a4-p-platform-v11.vercel.app/club'
               }
             })
 
@@ -85,12 +74,10 @@ export default function ClubPage() {
     )
   }
 
-  // PAS DE PROFIL
   if (!profile) {
     return <div>Aucun profil trouvé (user connecté mais non relié)</div>
   }
 
-  // OK
   return (
     <div style={{ padding: 20 }}>
       <h1>Portail Club A4P</h1>
