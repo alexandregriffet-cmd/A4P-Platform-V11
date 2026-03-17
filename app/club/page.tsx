@@ -1,12 +1,13 @@
-import Link from 'next/link'
-import { supabase } from '@/lib/supabaseClient'
+'use client'
 
-type SearchParamsInput = {
-  as?: string | string[]
-}
+import Link from 'next/link'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabaseClient'
 
 type ClubUser = {
   id: string
+  auth_user_id?: string | null
   club_id?: string | null
   team_id?: string | null
   role?: 'a4p_admin' | 'club_admin' | 'coach' | 'player' | string | null
@@ -61,6 +62,21 @@ type PsychoResult = {
   team_id?: string | null
   stress_level?: number | string | null
   created_at?: string | null
+}
+
+type PageState = {
+  loading: boolean
+  error: string
+  selectedUser: ClubUser | null
+  visibleClubs: Club[]
+  visibleTeams: Team[]
+  visiblePlayers: Player[]
+  cmpAverage: number | null
+  pmpAverage: number | null
+  stressAverage: number | null
+  cmpByPlayer: Map<string, ResultBase>
+  pmpByPlayer: Map<string, ResultBase>
+  psychoByPlayer: Map<string, PsychoResult>
 }
 
 function normalizeScore(value: unknown): number | null {
@@ -150,142 +166,203 @@ function SectionCard({
   )
 }
 
-function roleButtonStyle(active: boolean) {
-  return {
-    textDecoration: 'none',
-    padding: '12px 16px',
-    borderRadius: 14,
-    fontWeight: 800,
-    background: active ? '#35528f' : '#ffffff',
-    color: active ? '#ffffff' : '#35528f',
-    border: active ? '1px solid #35528f' : '1px solid #d7dfec',
-    boxShadow: active ? '0 10px 24px rgba(53,82,143,0.18)' : 'none',
-    display: 'inline-block'
-  } as const
-}
+export default function ClubPage() {
+  const router = useRouter()
 
-export default async function ClubPage({
-  searchParams
-}: {
-  searchParams?: SearchParamsInput
-}) {
-  const rawRole = searchParams?.as
-  const actingAs = Array.isArray(rawRole) ? rawRole[0] : rawRole || 'a4p_admin'
+  const [state, setState] = useState<PageState>({
+    loading: true,
+    error: '',
+    selectedUser: null,
+    visibleClubs: [],
+    visibleTeams: [],
+    visiblePlayers: [],
+    cmpAverage: null,
+    pmpAverage: null,
+    stressAverage: null,
+    cmpByPlayer: new Map(),
+    pmpByPlayer: new Map(),
+    psychoByPlayer: new Map()
+  })
 
-  const [
-    usersRes,
-    clubsRes,
-    teamsRes,
-    playersRes,
-    cmpRes,
-    pmpRes,
-    psychoRes
-  ] = await Promise.all([
-    supabase.from('club_users').select('*').order('created_at', { ascending: false }),
-    supabase.from('clubs').select('*').order('created_at', { ascending: false }),
-    supabase.from('teams').select('*').order('created_at', { ascending: false }),
-    supabase.from('players').select('*').order('created_at', { ascending: false }),
-    supabase.from('cmp_results').select('*').order('created_at', { ascending: false }),
-    supabase.from('pmp_results').select('*').order('created_at', { ascending: false }),
-    supabase.from('psycho_results').select('*').order('created_at', { ascending: false })
-  ])
+  useEffect(() => {
+    let cancelled = false
 
-  const users = (usersRes.data as ClubUser[] | null) ?? []
-  const clubs = (clubsRes.data as Club[] | null) ?? []
-  const teams = (teamsRes.data as Team[] | null) ?? []
-  const players = (playersRes.data as Player[] | null) ?? []
-  const cmpResults = (cmpRes.data as ResultBase[] | null) ?? []
-  const pmpResults = (pmpRes.data as ResultBase[] | null) ?? []
-  const psychoResults = (psychoRes.data as PsychoResult[] | null) ?? []
+    async function load() {
+      try {
+        setState((prev) => ({ ...prev, loading: true, error: '' }))
 
-  const errorMessage =
-    usersRes.error?.message ||
-    clubsRes.error?.message ||
-    teamsRes.error?.message ||
-    playersRes.error?.message ||
-    cmpRes.error?.message ||
-    pmpRes.error?.message ||
-    psychoRes.error?.message ||
-    ''
+        const {
+          data: { session },
+          error: sessionError
+        } = await supabase.auth.getSession()
 
-  const selectedUser =
-    actingAs === 'a4p_admin'
-      ? users.find((u) => u.role === 'a4p_admin') || null
-      : actingAs === 'club_admin'
-        ? users.find((u) => u.role === 'club_admin') || null
-        : actingAs === 'coach'
-          ? users.find((u) => u.role === 'coach') || null
-          : actingAs === 'player'
-            ? users.find((u) => u.role === 'player') || null
-            : null
+        if (sessionError) {
+          throw new Error(sessionError.message)
+        }
 
-  const visibleClubs =
-    !selectedUser
-      ? []
-      : selectedUser.role === 'a4p_admin'
-        ? clubs
-        : clubs.filter((club) => club.id === selectedUser.club_id)
+        if (!session) {
+          router.push('/login')
+          return
+        }
 
-  const visibleTeams =
-    !selectedUser
-      ? []
-      : selectedUser.role === 'a4p_admin'
-        ? teams
-        : selectedUser.role === 'club_admin'
-          ? teams.filter((team) => team.club_id === selectedUser.club_id)
-          : selectedUser.role === 'coach'
-            ? teams.filter((team) => team.id === selectedUser.team_id)
-            : (() => {
-                const myPlayer = players.find((p) => p.club_user_id === selectedUser.id)
-                return myPlayer?.team_id ? teams.filter((team) => team.id === myPlayer.team_id) : []
-              })()
+        const authUserId = session.user.id
 
-  const visiblePlayers =
-    !selectedUser
-      ? []
-      : selectedUser.role === 'a4p_admin'
-        ? players
-        : selectedUser.role === 'club_admin'
-          ? players.filter((player) => player.club_id === selectedUser.club_id)
-          : selectedUser.role === 'coach'
-            ? players.filter((player) => player.team_id === selectedUser.team_id)
-            : players.filter((player) => player.club_user_id === selectedUser.id)
+        const [
+          userRes,
+          clubsRes,
+          teamsRes,
+          playersRes,
+          cmpRes,
+          pmpRes,
+          psychoRes
+        ] = await Promise.all([
+          supabase
+            .from('club_users')
+            .select('*')
+            .eq('auth_user_id', authUserId)
+            .maybeSingle(),
+          supabase.from('clubs').select('*').order('created_at', { ascending: false }),
+          supabase.from('teams').select('*').order('created_at', { ascending: false }),
+          supabase.from('players').select('*').order('created_at', { ascending: false }),
+          supabase.from('cmp_results').select('*').order('created_at', { ascending: false }),
+          supabase.from('pmp_results').select('*').order('created_at', { ascending: false }),
+          supabase.from('psycho_results').select('*').order('created_at', { ascending: false })
+        ])
 
-  const visiblePlayerIds = visiblePlayers.map((p) => p.id)
+        if (userRes.error) throw new Error(`club_users: ${userRes.error.message}`)
+        if (clubsRes.error) throw new Error(`clubs: ${clubsRes.error.message}`)
+        if (teamsRes.error) throw new Error(`teams: ${teamsRes.error.message}`)
+        if (playersRes.error) throw new Error(`players: ${playersRes.error.message}`)
+        if (cmpRes.error) throw new Error(`cmp_results: ${cmpRes.error.message}`)
+        if (pmpRes.error) throw new Error(`pmp_results: ${pmpRes.error.message}`)
+        if (psychoRes.error) throw new Error(`psycho_results: ${psychoRes.error.message}`)
 
-  const latestCmpByPlayer = new Map<string, ResultBase>()
-  for (const item of cmpResults) {
-    const pid = typeof item.player_id === 'string' ? item.player_id : null
-    if (pid && visiblePlayerIds.includes(pid) && !latestCmpByPlayer.has(pid)) {
-      latestCmpByPlayer.set(pid, item)
+        const selectedUser = (userRes.data as ClubUser | null) ?? null
+        const clubs = (clubsRes.data as Club[] | null) ?? []
+        const teams = (teamsRes.data as Team[] | null) ?? []
+        const players = (playersRes.data as Player[] | null) ?? []
+        const cmpResults = (cmpRes.data as ResultBase[] | null) ?? []
+        const pmpResults = (pmpRes.data as ResultBase[] | null) ?? []
+        const psychoResults = (psychoRes.data as PsychoResult[] | null) ?? []
+
+        if (!selectedUser) {
+          throw new Error("Aucun profil club_users relié à cet utilisateur connecté.")
+        }
+
+        const visibleClubs =
+          selectedUser.role === 'a4p_admin'
+            ? clubs
+            : clubs.filter((club) => club.id === selectedUser.club_id)
+
+        const visibleTeams =
+          selectedUser.role === 'a4p_admin'
+            ? teams
+            : selectedUser.role === 'club_admin'
+              ? teams.filter((team) => team.club_id === selectedUser.club_id)
+              : selectedUser.role === 'coach'
+                ? teams.filter((team) => team.id === selectedUser.team_id)
+                : (() => {
+                    const myPlayer = players.find((p) => p.club_user_id === selectedUser.id)
+                    return myPlayer?.team_id ? teams.filter((team) => team.id === myPlayer.team_id) : []
+                  })()
+
+        const visiblePlayers =
+          selectedUser.role === 'a4p_admin'
+            ? players
+            : selectedUser.role === 'club_admin'
+              ? players.filter((player) => player.club_id === selectedUser.club_id)
+              : selectedUser.role === 'coach'
+                ? players.filter((player) => player.team_id === selectedUser.team_id)
+                : players.filter((player) => player.club_user_id === selectedUser.id)
+
+        const visiblePlayerIds = visiblePlayers.map((p) => p.id)
+
+        const cmpByPlayer = new Map<string, ResultBase>()
+        for (const item of cmpResults) {
+          const pid = typeof item.player_id === 'string' ? item.player_id : null
+          if (pid && visiblePlayerIds.includes(pid) && !cmpByPlayer.has(pid)) {
+            cmpByPlayer.set(pid, item)
+          }
+        }
+
+        const pmpByPlayer = new Map<string, ResultBase>()
+        for (const item of pmpResults) {
+          const pid = typeof item.player_id === 'string' ? item.player_id : null
+          if (pid && visiblePlayerIds.includes(pid) && !pmpByPlayer.has(pid)) {
+            pmpByPlayer.set(pid, item)
+          }
+        }
+
+        const psychoByPlayer = new Map<string, PsychoResult>()
+        for (const item of psychoResults) {
+          const pid = typeof item.player_id === 'string' ? item.player_id : null
+          if (pid && visiblePlayerIds.includes(pid) && !psychoByPlayer.has(pid)) {
+            psychoByPlayer.set(pid, item)
+          }
+        }
+
+        const cmpAverage = average(
+          visiblePlayers.map((p) => normalizeScore(cmpByPlayer.get(p.id)?.score_global))
+        )
+        const pmpAverage = average(
+          visiblePlayers.map((p) => normalizeScore(pmpByPlayer.get(p.id)?.score_global))
+        )
+        const stressAverage = average(
+          visiblePlayers.map((p) => normalizeScore(psychoByPlayer.get(p.id)?.stress_level))
+        )
+
+        if (!cancelled) {
+          setState({
+            loading: false,
+            error: '',
+            selectedUser,
+            visibleClubs,
+            visibleTeams,
+            visiblePlayers,
+            cmpAverage,
+            pmpAverage,
+            stressAverage,
+            cmpByPlayer,
+            pmpByPlayer,
+            psychoByPlayer
+          })
+        }
+      } catch (error: any) {
+        if (!cancelled) {
+          setState((prev) => ({
+            ...prev,
+            loading: false,
+            error: error?.message || 'Erreur inconnue.'
+          }))
+        }
+      }
     }
+
+    void load()
+
+    return () => {
+      cancelled = true
+    }
+  }, [router])
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    router.push('/login')
   }
 
-  const latestPmpByPlayer = new Map<string, ResultBase>()
-  for (const item of pmpResults) {
-    const pid = typeof item.player_id === 'string' ? item.player_id : null
-    if (pid && visiblePlayerIds.includes(pid) && !latestPmpByPlayer.has(pid)) {
-      latestPmpByPlayer.set(pid, item)
-    }
+  if (state.loading) {
+    return <div style={{ padding: 24 }}>Chargement...</div>
   }
 
-  const latestPsychoByPlayer = new Map<string, PsychoResult>()
-  for (const item of psychoResults) {
-    const pid = typeof item.player_id === 'string' ? item.player_id : null
-    if (pid && visiblePlayerIds.includes(pid) && !latestPsychoByPlayer.has(pid)) {
-      latestPsychoByPlayer.set(pid, item)
-    }
+  if (state.error) {
+    return (
+      <main style={{ padding: 24 }}>
+        <h1>Accès club indisponible</h1>
+        <p>{state.error}</p>
+        <Link href="/login">Retour login</Link>
+      </main>
+    )
   }
-
-  const cmpAverage = average(
-    visiblePlayers.map((p) => normalizeScore(latestCmpByPlayer.get(p.id)?.score_global))
-  )
-  const pmpAverage = average(
-    visiblePlayers.map((p) => normalizeScore(latestPmpByPlayer.get(p.id)?.score_global))
-  )
-  const stressAverage = average(
-    visiblePlayers.map((p) => normalizeScore(latestPsychoByPlayer.get(p.id)?.stress_level))
-  )
 
   return (
     <main style={{ maxWidth: 1280, margin: '0 auto', padding: 24, background: '#eef2f7' }}>
@@ -312,36 +389,29 @@ export default async function ClubPage({
               Portail Club A4P
             </h1>
             <p style={{ margin: '14px 0 0 0', fontSize: 18, color: '#667085', lineHeight: 1.7 }}>
-              Vue démo pilotée par rôle.
+              Connexion réelle Supabase active.
             </p>
             <p style={{ margin: '10px 0 0 0', fontSize: 16, color: '#35528f', fontWeight: 800 }}>
-              Vue active : {selectedUser?.role || actingAs} · {getUserName(selectedUser)}
+              Utilisateur connecté : {state.selectedUser?.role || '—'} · {getUserName(state.selectedUser)}
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <Link href="/club?as=a4p_admin" style={roleButtonStyle((selectedUser?.role || actingAs) === 'a4p_admin')}>
-              Admin A4P
-            </Link>
-            <Link href="/club?as=club_admin" style={roleButtonStyle((selectedUser?.role || actingAs) === 'club_admin')}>
-              Admin club
-            </Link>
-            <Link href="/club?as=coach" style={roleButtonStyle((selectedUser?.role || actingAs) === 'coach')}>
-              Coach
-            </Link>
-            <Link href="/club?as=player" style={roleButtonStyle((selectedUser?.role || actingAs) === 'player')}>
-              Joueur
-            </Link>
-          </div>
+          <button
+            onClick={handleLogout}
+            style={{
+              padding: '12px 16px',
+              borderRadius: 14,
+              fontWeight: 800,
+              background: '#35528f',
+              color: '#ffffff',
+              border: '1px solid #35528f'
+            }}
+          >
+            Déconnexion
+          </button>
         </div>
       </section>
 
-      {errorMessage ? (
-        <SectionCard title="Lecture données">
-          <p style={{ margin: 0, color: '#b42318', lineHeight: 1.7 }}>{errorMessage}</p>
-        </SectionCard>
-      ) : null}
-
       <section
         style={{
           display: 'grid',
@@ -350,10 +420,10 @@ export default async function ClubPage({
           marginBottom: 24
         }}
       >
-        <StatCard value={visibleClubs.length} label="Clubs visibles" />
-        <StatCard value={visibleTeams.length} label="Équipes visibles" />
-        <StatCard value={visiblePlayers.length} label="Joueurs visibles" />
-        <StatCard value={cmpAverage !== null ? `${cmpAverage}/100` : '—'} label="Moyenne CMP visible" />
+        <StatCard value={state.visibleClubs.length} label="Clubs visibles" />
+        <StatCard value={state.visibleTeams.length} label="Équipes visibles" />
+        <StatCard value={state.visiblePlayers.length} label="Joueurs visibles" />
+        <StatCard value={state.cmpAverage !== null ? `${state.cmpAverage}/100` : '—'} label="Moyenne CMP visible" />
       </section>
 
       <section
@@ -364,10 +434,10 @@ export default async function ClubPage({
           marginBottom: 24
         }}
       >
-        <StatCard value={pmpAverage !== null ? `${pmpAverage}/100` : '—'} label="Moyenne PMP visible" />
-        <StatCard value={stressAverage !== null ? `${stressAverage}/100` : '—'} label="Stress moyen visible" />
-        <StatCard value={selectedUser?.club_id ? 'Oui' : 'Non'} label="Club attribué" />
-        <StatCard value={selectedUser?.team_id ? 'Oui' : 'Non'} label="Équipe attribuée" />
+        <StatCard value={state.pmpAverage !== null ? `${state.pmpAverage}/100` : '—'} label="Moyenne PMP visible" />
+        <StatCard value={state.stressAverage !== null ? `${state.stressAverage}/100` : '—'} label="Stress moyen visible" />
+        <StatCard value={state.selectedUser?.club_id ? 'Oui' : 'Non'} label="Club attribué" />
+        <StatCard value={state.selectedUser?.team_id ? 'Oui' : 'Non'} label="Équipe attribuée" />
       </section>
 
       <section
@@ -381,44 +451,46 @@ export default async function ClubPage({
         <SectionCard title="Périmètre visible">
           <div style={{ display: 'grid', gap: 12 }}>
             <p style={{ margin: 0, lineHeight: 1.8, color: '#44516d' }}>
-              <strong>Rôle :</strong> {selectedUser?.role || actingAs}
+              <strong>Rôle :</strong> {state.selectedUser?.role || '—'}
             </p>
             <p style={{ margin: 0, lineHeight: 1.8, color: '#44516d' }}>
               <strong>Clubs :</strong>{' '}
-              {visibleClubs.length > 0 ? visibleClubs.map((c) => c.name || 'Club').join(', ') : 'Aucun'}
+              {state.visibleClubs.length > 0
+                ? state.visibleClubs.map((c) => c.name || 'Club').join(', ')
+                : 'Aucun'}
             </p>
             <p style={{ margin: 0, lineHeight: 1.8, color: '#44516d' }}>
               <strong>Équipes :</strong>{' '}
-              {visibleTeams.length > 0 ? visibleTeams.map((t) => t.name || 'Équipe').join(', ') : 'Aucune'}
+              {state.visibleTeams.length > 0
+                ? state.visibleTeams.map((t) => t.name || 'Équipe').join(', ')
+                : 'Aucune'}
             </p>
             <p style={{ margin: 0, lineHeight: 1.8, color: '#44516d' }}>
-              <strong>Joueurs visibles :</strong> {visiblePlayers.length}
+              <strong>Joueurs visibles :</strong> {state.visiblePlayers.length}
             </p>
           </div>
         </SectionCard>
 
         <SectionCard title="Accès attendu">
-          <div style={{ display: 'grid', gap: 12 }}>
-            <p style={{ margin: 0, lineHeight: 1.8, color: '#44516d' }}>
-              {(selectedUser?.role || actingAs) === 'a4p_admin' &&
-                "L’administrateur A4P voit tous les clubs, toutes les équipes, tous les joueurs et toutes les données."}
-              {(selectedUser?.role || actingAs) === 'club_admin' &&
-                "L’administrateur club voit uniquement son club, toutes ses équipes et tous ses joueurs."}
-              {(selectedUser?.role || actingAs) === 'coach' &&
-                "Le coach voit uniquement son équipe, ses joueurs et la synthèse collective de son groupe."}
-              {(selectedUser?.role || actingAs) === 'player' &&
-                "Le joueur voit uniquement ses propres résultats et son historique individuel."}
-            </p>
-          </div>
+          <p style={{ margin: 0, lineHeight: 1.8, color: '#44516d' }}>
+            {state.selectedUser?.role === 'a4p_admin' &&
+              "L’administrateur A4P voit tous les clubs, toutes les équipes, tous les joueurs et toutes les données."}
+            {state.selectedUser?.role === 'club_admin' &&
+              "L’administrateur club voit uniquement son club, toutes ses équipes et tous ses joueurs."}
+            {state.selectedUser?.role === 'coach' &&
+              "Le coach voit uniquement son équipe, ses joueurs et la synthèse collective de son groupe."}
+            {state.selectedUser?.role === 'player' &&
+              "Le joueur voit uniquement ses propres résultats et son historique individuel."}
+          </p>
         </SectionCard>
       </section>
 
       <SectionCard title="Équipes visibles">
-        {visibleTeams.length === 0 ? (
+        {state.visibleTeams.length === 0 ? (
           <p style={{ margin: 0, color: '#667085' }}>Aucune équipe visible pour ce rôle.</p>
         ) : (
           <div style={{ display: 'grid', gap: 14 }}>
-            {visibleTeams.map((team) => (
+            {state.visibleTeams.map((team) => (
               <div
                 key={team.id}
                 style={{
@@ -459,14 +531,14 @@ export default async function ClubPage({
       <div style={{ height: 24 }} />
 
       <SectionCard title="Joueurs visibles">
-        {visiblePlayers.length === 0 ? (
+        {state.visiblePlayers.length === 0 ? (
           <p style={{ margin: 0, color: '#667085' }}>Aucun joueur visible pour ce rôle.</p>
         ) : (
           <div style={{ display: 'grid', gap: 14 }}>
-            {visiblePlayers.map((player) => {
-              const cmp = normalizeScore(latestCmpByPlayer.get(player.id)?.score_global)
-              const pmp = normalizeScore(latestPmpByPlayer.get(player.id)?.score_global)
-              const stress = normalizeScore(latestPsychoByPlayer.get(player.id)?.stress_level)
+            {state.visiblePlayers.map((player) => {
+              const cmp = normalizeScore(state.cmpByPlayer.get(player.id)?.score_global)
+              const pmp = normalizeScore(state.pmpByPlayer.get(player.id)?.score_global)
+              const stress = normalizeScore(state.psychoByPlayer.get(player.id)?.stress_level)
 
               return (
                 <div
