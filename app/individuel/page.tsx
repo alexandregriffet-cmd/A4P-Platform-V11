@@ -1,14 +1,5 @@
 import Link from 'next/link'
 
-const HUB_URL =
-  'https://alexandregriffet-cmd.github.io/A4P-Diagnostic-Academie-de-Performances/'
-const PMP_URL =
-  'https://alexandregriffet-cmd.github.io/PMP-A4P-Acad-mie-de-Performances-/'
-const CMP_URL =
-  'https://alexandregriffet-cmd.github.io/CMP-A4P-ACADEMIE-DE-PERFORMANCES-/'
-const PSYCHO_URL =
-  'https://alexandregriffet-cmd.github.io/Module-psycho-motionnelle-/'
-
 export default function IndividuelPage() {
   return (
     <main
@@ -80,9 +71,8 @@ export default function IndividuelPage() {
               color: 'rgba(255,255,255,0.92)',
             }}
           >
-            Vous allez passer trois évaluations complémentaires pour analyser
-            votre fonctionnement mental, émotionnel et vos ressources de
-            performance.
+            L’accès aux tests individuels est personnel, sécurisé et contrôlé.
+            Une connexion est nécessaire avant toute passation.
           </p>
 
           <div
@@ -145,7 +135,7 @@ export default function IndividuelPage() {
 
             <p
               style={{
-                margin: '0 0 8px 0',
+                margin: 0,
                 fontSize: 17,
                 lineHeight: 1.6,
                 color: '#5d6d89',
@@ -191,7 +181,7 @@ export default function IndividuelPage() {
 
             <p
               style={{
-                margin: '0 0 8px 0',
+                margin: 0,
                 fontSize: 17,
                 lineHeight: 1.6,
                 color: '#5d6d89',
@@ -237,7 +227,7 @@ export default function IndividuelPage() {
 
             <p
               style={{
-                margin: '0 0 8px 0',
+                margin: 0,
                 fontSize: 17,
                 lineHeight: 1.6,
                 color: '#5d6d89',
@@ -288,14 +278,49 @@ export default function IndividuelPage() {
 
         <section
           style={{
+            background: '#ffffff',
+            borderRadius: 22,
+            padding: 22,
+            boxShadow: '0 10px 28px rgba(31,49,88,0.08)',
+            border: '1px solid #e3eaf5',
+            marginBottom: 22,
+          }}
+        >
+          <h3
+            style={{
+              margin: '0 0 12px 0',
+              fontSize: 24,
+              fontWeight: 900,
+              color: '#1f3158',
+            }}
+          >
+            Règles d’accès
+          </h3>
+
+          <ul
+            style={{
+              margin: 0,
+              paddingLeft: 20,
+              fontSize: 16,
+              lineHeight: 1.9,
+              color: '#5d6d89',
+            }}
+          >
+            <li>Connexion obligatoire avant toute passation</li>
+            <li>Un seul passage autorisé par test</li>
+            <li>Nouvelle passation uniquement sur autorisation A4P</li>
+            <li>Accès étendu possible dans le cadre d’un abonnement</li>
+          </ul>
+        </section>
+
+        <section
+          style={{
             display: 'grid',
             gap: 14,
           }}
         >
-          <a
-            href={PMP_URL}
-            target="_blank"
-            rel="noreferrer"
+          <Link
+            href="/individuel/connexion"
             style={{
               textDecoration: 'none',
             }}
@@ -312,103 +337,23 @@ export default function IndividuelPage() {
                 boxShadow: '0 12px 28px rgba(31,49,88,0.16)',
               }}
             >
-              Commencer mon diagnostic →
+              Me connecter pour commencer →
             </div>
-          </a>
+          </Link>
 
           <div
             style={{
-              display: 'grid',
-              gap: 12,
+              background: '#ffffff',
+              color: '#6d7b95',
+              borderRadius: 14,
+              padding: '15px 18px',
+              fontWeight: 700,
+              fontSize: 15,
+              textAlign: 'center',
+              border: '1px solid #dbe4f2',
             }}
           >
-            <a
-              href={PMP_URL}
-              target="_blank"
-              rel="noreferrer"
-              style={{ textDecoration: 'none' }}
-            >
-              <div
-                style={{
-                  background: '#ffffff',
-                  color: '#1f3158',
-                  borderRadius: 14,
-                  padding: '15px 18px',
-                  fontWeight: 800,
-                  fontSize: 16,
-                  textAlign: 'center',
-                  border: '1px solid #dbe4f2',
-                }}
-              >
-                Ouvrir le test PMP
-              </div>
-            </a>
-
-            <a
-              href={PSYCHO_URL}
-              target="_blank"
-              rel="noreferrer"
-              style={{ textDecoration: 'none' }}
-            >
-              <div
-                style={{
-                  background: '#ffffff',
-                  color: '#1f3158',
-                  borderRadius: 14,
-                  padding: '15px 18px',
-                  fontWeight: 800,
-                  fontSize: 16,
-                  textAlign: 'center',
-                  border: '1px solid #dbe4f2',
-                }}
-              >
-                Ouvrir le test psycho-émotionnel
-              </div>
-            </a>
-
-            <a
-              href={CMP_URL}
-              target="_blank"
-              rel="noreferrer"
-              style={{ textDecoration: 'none' }}
-            >
-              <div
-                style={{
-                  background: '#ffffff',
-                  color: '#1f3158',
-                  borderRadius: 14,
-                  padding: '15px 18px',
-                  fontWeight: 800,
-                  fontSize: 16,
-                  textAlign: 'center',
-                  border: '1px solid #dbe4f2',
-                }}
-              >
-                Ouvrir le test CMP
-              </div>
-            </a>
-
-            <a
-              href={HUB_URL}
-              target="_blank"
-              rel="noreferrer"
-              style={{ textDecoration: 'none' }}
-            >
-              <div
-                style={{
-                  background: '#ffffff',
-                  color: '#1f3158',
-                  borderRadius: 14,
-                  padding: '15px 18px',
-                  fontWeight: 800,
-                  fontSize: 16,
-                  textAlign: 'center',
-                  border: '1px solid #dbe4f2',
-                }}
-              >
-                Ouvrir mon hub individuel
-              </div>
-            </a>
+            Aucun accès direct aux tests sans validation préalable
           </div>
 
           <p
@@ -420,8 +365,8 @@ export default function IndividuelPage() {
               lineHeight: 1.6,
             }}
           >
-            Le parcours recommandé commence par le PMP, puis le
-            psycho-émotionnel, puis le CMP.
+            Après connexion, la plateforme vérifiera automatiquement vos droits
+            d’accès et le nombre de passations autorisées.
           </p>
         </section>
       </div>
