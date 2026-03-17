@@ -17,22 +17,21 @@ export default function HomePage() {
           style={{
             background: 'linear-gradient(135deg, #223a6b 0%, #2d4d8e 100%)',
             borderRadius: 24,
-            padding: '22px 18px 26px',
+            padding: '20px 18px 24px',
             boxShadow: '0 18px 48px rgba(31,49,88,0.14)',
             color: '#ffffff',
             marginBottom: 22,
             textAlign: 'center',
           }}
         >
-          {/* LOGO LIGHT */}
+          {/* LOGO */}
           <img
             src="/logo-a4p.png"
             alt="A4P"
             style={{
-              width: 180,
-              margin: '0 auto 12px',
+              width: 140,
+              margin: '0 auto 10px',
               display: 'block',
-              opacity: 0.95,
             }}
           />
 
@@ -42,7 +41,6 @@ export default function HomePage() {
               letterSpacing: 1.2,
               textTransform: 'uppercase',
               opacity: 0.7,
-              marginBottom: 6,
             }}
           >
             Plateforme A4P
@@ -50,22 +48,15 @@ export default function HomePage() {
 
           <h1
             style={{
-              margin: 0,
-              fontSize: 32,
+              margin: '6px 0',
+              fontSize: 30,
               fontWeight: 900,
-              lineHeight: 1.2,
             }}
           >
             Choisissez votre accès
           </h1>
 
-          <p
-            style={{
-              marginTop: 8,
-              fontSize: 16,
-              opacity: 0.85,
-            }}
-          >
+          <p style={{ fontSize: 15, opacity: 0.85 }}>
             Individuel ou club
           </p>
         </section>
@@ -84,7 +75,14 @@ export default function HomePage() {
                 border: '1px solid #e3eaf5',
               }}
             >
-              <h2 style={{ fontSize: 26, fontWeight: 900, marginBottom: 8 }}>
+              <h2
+                style={{
+                  fontSize: 26,
+                  fontWeight: 900,
+                  marginBottom: 8,
+                  color: '#1f3158',
+                }}
+              >
                 Accès individuel
               </h2>
 
@@ -125,7 +123,14 @@ export default function HomePage() {
                 border: '1px solid #e3eaf5',
               }}
             >
-              <h2 style={{ fontSize: 26, fontWeight: 900, marginBottom: 8 }}>
+              <h2
+                style={{
+                  fontSize: 26,
+                  fontWeight: 900,
+                  marginBottom: 8,
+                  color: '#1f3158',
+                }}
+              >
                 Accès club
               </h2>
 
