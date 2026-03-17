@@ -72,7 +72,7 @@ type PsychoResult = {
 type PageState = {
   loading: boolean
   error: string
-  userState: any | null
+  userState: { id: string; email?: string | null } | null
   selectedUser: ClubUser | null
   visibleClubs: Club[]
   visibleTeams: Team[]
@@ -166,7 +166,9 @@ function SectionCard({
         boxShadow: '0 10px 30px rgba(20,30,60,0.08)'
       }}
     >
-      <h2 style={{ marginTop: 0, marginBottom: 18, fontSize: 30, color: '#182847' }}>{title}</h2>
+      <h2 style={{ marginTop: 0, marginBottom: 18, fontSize: 30, color: '#182847' }}>
+        {title}
+      </h2>
       {children}
     </div>
   )
@@ -258,7 +260,7 @@ export default function ClubPage() {
             setState((prev) => ({
               ...prev,
               loading: false,
-              userState: user,
+              userState: { id: user.id, email: user.email },
               selectedUser: null,
               error: 'Aucun profil club_users relié à cet utilisateur connecté.'
             }))
@@ -266,31 +268,33 @@ export default function ClubPage() {
           return
         }
 
-        const visibleClubs =
-          selectedUser.role === 'a4p_admin'
-            ? clubs
-            : clubs.filter((club) => club.id === selectedUser.club_id)
+        let visibleClubs: Club[] = []
+        let visibleTeams: Team[] = []
+        let visiblePlayers: Player[] = []
 
-        const visibleTeams =
-          selectedUser.role === 'a4p_admin'
-            ? teams
-            : selectedUser.role === 'club_admin'
-              ? teams.filter((team) => team.club_id === selectedUser.club_id)
-              : selectedUser.role === 'coach'
-                ? teams.filter((team) => team.id === selectedUser.team_id)
-                : (() => {
-                    const myPlayer = players.find((p) => p.club_user_id === selectedUser.id)
-                    return myPlayer?.team_id ? teams.filter((team) => team.id === myPlayer.team_id) : []
-                  })()
+        if (selectedUser.role === 'a4p_admin') {
+          visibleClubs = clubs
+          visibleTeams = teams
+          visiblePlayers = players
+        } else if (selectedUser.role === 'club_admin') {
+          visibleClubs = clubs.filter((club) => club.id === selectedUser.club_id)
+          visibleTeams = teams.filter((team) => team.club_id === selectedUser.club_id)
+          visiblePlayers = players.filter((player) => player.club_id === selectedUser.club_id)
+        } else if (selectedUser.role === 'coach') {
+          visibleClubs = clubs.filter((club) => club.id === selectedUser.club_id)
+          visibleTeams = teams.filter((team) => team.id === selectedUser.team_id)
+          visiblePlayers = players.filter((player) => player.team_id === selectedUser.team_id)
+        } else if (selectedUser.role === 'player') {
+          visibleClubs = clubs.filter((club) => club.id === selectedUser.club_id)
 
-        const visiblePlayers =
-          selectedUser.role === 'a4p_admin'
-            ? players
-            : selectedUser.role === 'club_admin'
-              ? players.filter((player) => player.club_id === selectedUser.club_id)
-              : selectedUser.role === 'coach'
-                ? players.filter((player) => player.team_id === selectedUser.team_id)
-                : players.filter((player) => player.club_user_id === selectedUser.id)
+          const myPlayer = players.find((p) => p.club_user_id === selectedUser.id)
+
+          visibleTeams = myPlayer?.team_id
+            ? teams.filter((team) => team.id === myPlayer.team_id)
+            : []
+
+          visiblePlayers = players.filter((player) => player.club_user_id === selectedUser.id)
+        }
 
         const visiblePlayerIds = visiblePlayers.map((p) => p.id)
 
@@ -321,9 +325,11 @@ export default function ClubPage() {
         const cmpAverage = average(
           visiblePlayers.map((p) => normalizeScore(cmpByPlayer.get(p.id)?.score_global))
         )
+
         const pmpAverage = average(
           visiblePlayers.map((p) => normalizeScore(pmpByPlayer.get(p.id)?.score_global))
         )
+
         const stressAverage = average(
           visiblePlayers.map((p) => normalizeScore(psychoByPlayer.get(p.id)?.stress_level))
         )
@@ -332,7 +338,7 @@ export default function ClubPage() {
           setState({
             loading: false,
             error: '',
-            userState: user,
+            userState: { id: user.id, email: user.email },
             selectedUser,
             visibleClubs,
             visibleTeams,
@@ -469,7 +475,10 @@ export default function ClubPage() {
         <StatCard value={state.visibleClubs.length} label="Clubs visibles" />
         <StatCard value={state.visibleTeams.length} label="Équipes visibles" />
         <StatCard value={state.visiblePlayers.length} label="Joueurs visibles" />
-        <StatCard value={state.cmpAverage !== null ? `${state.cmpAverage}/100` : '—'} label="Moyenne CMP visible" />
+        <StatCard
+          value={state.cmpAverage !== null ? `${state.cmpAverage}/100` : '—'}
+          label="Moyenne CMP visible"
+        />
       </section>
 
       <section
@@ -480,8 +489,14 @@ export default function ClubPage() {
           marginBottom: 24
         }}
       >
-        <StatCard value={state.pmpAverage !== null ? `${state.pmpAverage}/100` : '—'} label="Moyenne PMP visible" />
-        <StatCard value={state.stressAverage !== null ? `${state.stressAverage}/100` : '—'} label="Stress moyen visible" />
+        <StatCard
+          value={state.pmpAverage !== null ? `${state.pmpAverage}/100` : '—'}
+          label="Moyenne PMP visible"
+        />
+        <StatCard
+          value={state.stressAverage !== null ? `${state.stressAverage}/100` : '—'}
+          label="Stress moyen visible"
+        />
         <StatCard value={state.selectedUser?.club_id ? 'Oui' : 'Non'} label="Club attribué" />
         <StatCard value={state.selectedUser?.team_id ? 'Oui' : 'Non'} label="Équipe attribuée" />
       </section>
@@ -647,91 +662,4 @@ export default function ClubPage() {
       </SectionCard>
     </main>
   )
-}
-
-function StatCard({
-  value,
-  label,
-  helper
-}: {
-  value: string | number
-  label: string
-  helper?: string
-}) {
-  return (
-    <div
-      style={{
-        background: '#ffffff',
-        borderRadius: 20,
-        padding: 22,
-        boxShadow: '0 10px 30px rgba(20,30,60,0.08)'
-      }}
-    >
-      <div
-        style={{
-          fontSize: 34,
-          fontWeight: 900,
-          color: '#1f3158',
-          marginBottom: 8,
-          wordBreak: 'break-word'
-        }}
-      >
-        {value}
-      </div>
-      <div style={{ fontSize: 16, fontWeight: 700, color: '#667085' }}>{label}</div>
-      {helper ? (
-        <div style={{ marginTop: 8, fontSize: 14, color: '#8a96ad', lineHeight: 1.5 }}>
-          {helper}
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
-function SectionCard({
-  title,
-  children
-}: {
-  title: string
-  children: React.ReactNode
-}) {
-  return (
-    <div
-      style={{
-        background: '#ffffff',
-        borderRadius: 24,
-        padding: 24,
-        boxShadow: '0 10px 30px rgba(20,30,60,0.08)'
-      }}
-    >
-      <h2 style={{ marginTop: 0, marginBottom: 18, fontSize: 30, color: '#182847' }}>{title}</h2>
-      {children}
-    </div>
-  )
-}
-
-function normalizeScore(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value)) return Math.round(value)
-  if (typeof value === 'string') {
-    const n = Number(value.replace(',', '.'))
-    if (Number.isFinite(n)) return Math.round(n)
-  }
-  return null
-}
-
-function average(values: Array<number | null>) {
-  const valid = values.filter((v): v is number => v !== null)
-  if (valid.length === 0) return null
-  return Math.round(valid.reduce((sum, v) => sum + v, 0) / valid.length)
-}
-
-function getUserName(user: any) {
-  if (!user) return 'Utilisateur'
-  const full = [user.firstname || '', user.lastname || ''].filter(Boolean).join(' ').trim()
-  return full || user.email || 'Utilisateur'
-}
-
-function getPlayerName(player: any) {
-  const full = [player.firstname || '', player.lastname || ''].filter(Boolean).join(' ').trim()
-  return full || 'Sportif sans nom'
 }
