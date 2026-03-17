@@ -47,12 +47,6 @@ type Result = {
   [key: string]: unknown
 }
 
-type TeamPlayerLite = {
-  id: string
-  firstname?: string | null
-  lastname?: string | null
-}
-
 type Radar = {
   confiance: number
   regulation: number
@@ -67,8 +61,26 @@ type PageState = {
   team: Team | null
   club: Club | null
   result: Result | null
-  teamResults: Result[]
-  teamPlayers: TeamPlayerLite[]
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+
+  if (error && typeof error === 'object') {
+    const maybeMessage = (error as { message?: unknown }).message
+    if (typeof maybeMessage === 'string' && maybeMessage.trim()) {
+      return maybeMessage
+    }
+
+    try {
+      return JSON.stringify(error)
+    } catch {
+      return 'Erreur inconnue.'
+    }
+  }
+
+  if (typeof error === 'string' && error.trim()) return error
+  return 'Erreur inconnue.'
 }
 
 function normalize(value: unknown): number | null {
@@ -95,10 +107,12 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 function getFromSource(source: Record<string, unknown> | null | undefined, keys: string[]) {
   if (!source) return null
+
   for (const key of keys) {
     const value = normalize(source[key])
     if (value !== null) return value
   }
+
   return null
 }
 
@@ -160,7 +174,7 @@ function extractRadar(result: Result | null): Radar | null {
   return null
 }
 
-function getPlayerName(player: { firstname?: string | null; lastname?: string | null } | null) {
+function getPlayerName(player: Player | null) {
   if (!player) return 'Joueur'
   const fullName = [player.firstname || '', player.lastname || ''].filter(Boolean).join(' ').trim()
   return fullName || 'Sportif sans nom'
@@ -180,6 +194,7 @@ function formatDate(value?: string | null) {
   if (!value) return '—'
   const d = new Date(value)
   if (Number.isNaN(d.getTime())) return '—'
+
   return new Intl.DateTimeFormat('fr-FR', {
     dateStyle: 'short',
     timeStyle: 'short'
@@ -194,14 +209,6 @@ function getLevel(score: number | null) {
   return 'Zone forte'
 }
 
-function getReadinessLabel(score: number | null) {
-  if (score === null) return 'Indisponible'
-  if (score < 45) return 'Vigilance'
-  if (score < 65) return 'À stabiliser'
-  if (score < 80) return 'Compétitif'
-  return 'Très prêt'
-}
-
 function getCoachInsight(score: number | null, radar: Radar | null) {
   if (radar) {
     const ordered = [
@@ -214,93 +221,14 @@ function getCoachInsight(score: number | null, radar: Radar | null) {
     const strongest = ordered[0]?.key || 'mental'
     const weakest = ordered[ordered.length - 1]?.key || 'mental'
 
-    return `Le levier actuellement le plus fort est la ${strongest}. Le point de vigilance principal concerne la ${weakest}. L’accompagnement doit s’appuyer sur le point fort pour renforcer la stabilité du joueur dans les moments à enjeu.`
+    return `Le levier actuellement le plus fort est la ${strongest}. Le point de vigilance principal concerne la ${weakest}.`
   }
 
   if (score === null) return 'Aucune lecture détaillée disponible pour le moment.'
-  if (score < 45) return "Le joueur a besoin d'un cadre mental simple, sécurisant et répétitif pour installer des repères stables."
-  if (score < 65) return "Le joueur présente une base utile mais encore irrégulière. L'enjeu principal est de transformer le potentiel en constance."
-  if (score < 80) return 'Le joueur montre une base mentale solide. Le travail du coach peut viser la précision et la répétabilité.'
-  return 'Le joueur présente une structure mentale forte. Le travail peut porter sur l’optimisation sous haute pression.'
-}
-
-function getProgressAxes(radar: Radar | null, score: number | null) {
-  if (!radar) {
-    if (score === null) {
-      return [
-        'Mettre en place des routines mentales simples.',
-        'Structurer un protocole de concentration avant effort.',
-        'Installer des repères de confiance observables.'
-      ]
-    }
-
-    if (score < 45) {
-      return [
-        'Revenir à des routines courtes et répétées avant entraînement et compétition.',
-        'Travailler la respiration et le recentrage émotionnel.',
-        'Reconstruire la confiance par micro-objectifs atteignables.'
-      ]
-    }
-
-    if (score < 65) {
-      return [
-        'Stabiliser le fonctionnement mental dans les temps faibles.',
-        'Identifier les déclencheurs qui perturbent la performance.',
-        "Renforcer la continuité entre intention, engagement et action."
-      ]
-    }
-
-    return [
-      'Consolider les acquis déjà présents.',
-      'Travailler la précision mentale sous pression.',
-      'Transformer les forces en habitudes durables.'
-    ]
-  }
-
-  return [
-    { key: 'confiance', value: radar.confiance, text: 'Renforcer la confiance par des repères de réussite concrets.' },
-    { key: 'regulation', value: radar.regulation, text: 'Améliorer la régulation émotionnelle avec routines respiratoires et recentrage.' },
-    { key: 'engagement', value: radar.engagement, text: "Clarifier l'intention d'action et maintenir l'engagement jusqu'au bout." },
-    { key: 'stabilite', value: radar.stabilite, text: 'Développer la stabilité mentale dans la durée et sous pression.' }
-  ]
-    .sort((a, b) => a.value - b.value)
-    .slice(0, 3)
-    .map((item) => item.text)
-}
-
-function getPercentileText(playerScore: number | null, teamScores: number[]) {
-  if (playerScore === null || teamScores.length <= 1) return 'Référence équipe indisponible'
-
-  const lowerOrEqual = teamScores.filter((s) => s <= playerScore).length
-  const percentile = Math.round((lowerOrEqual / teamScores.length) * 100)
-
-  if (percentile >= 80) return `Top ${100 - percentile}% équipe`
-  if (percentile >= 60) return 'Au-dessus de la moyenne équipe'
-  if (percentile >= 40) return 'Dans la moyenne équipe'
-  return 'En dessous de la moyenne équipe'
-}
-
-function buildTeamRanking(teamPlayers: TeamPlayerLite[], teamResults: Result[], currentPlayerId: string) {
-  const latestByPlayer = new Map<string, Result>()
-
-  for (const item of teamResults) {
-    const pid = typeof item.player_id === 'string' ? item.player_id : null
-    if (!pid) continue
-    if (!latestByPlayer.has(pid)) latestByPlayer.set(pid, item)
-  }
-
-  return teamPlayers
-    .map((player) => {
-      const result = latestByPlayer.get(player.id)
-      return {
-        playerId: player.id,
-        name: getPlayerName(player),
-        score: normalize(result?.score_global),
-        isCurrentPlayer: player.id === currentPlayerId
-      }
-    })
-    .filter((row) => row.score !== null)
-    .sort((a, b) => (b.score ?? -1) - (a.score ?? -1))
+  if (score < 45) return "Le joueur a besoin d'un cadre mental simple et sécurisant."
+  if (score < 65) return "Le joueur présente une base utile mais encore irrégulière."
+  if (score < 80) return 'Le joueur montre une base mentale solide.'
+  return 'Le joueur présente une structure mentale forte.'
 }
 
 function RadarChart({ radar }: { radar: Radar | null }) {
@@ -388,6 +316,7 @@ function RadarChart({ radar }: { radar: Radar | null }) {
     </div>
   )
 }
+
 function StatCard({
   value,
   label,
@@ -412,72 +341,16 @@ function StatCard({
           lineHeight: 1.05,
           fontWeight: 900,
           color: '#20335d',
-          marginBottom: 10,
-          wordBreak: 'break-word'
+          marginBottom: 10
         }}
       >
         {value}
       </div>
-      <div style={{ fontSize: 18, lineHeight: 1.35, fontWeight: 800, color: '#667085' }}>
-        {label}
-      </div>
-      {helper ? (
-        <div style={{ marginTop: 8, fontSize: 14, lineHeight: 1.5, color: '#8a96ad' }}>
-          {helper}
-        </div>
-      ) : null}
+
+      <div style={{ fontSize: 18, fontWeight: 800, color: '#667085' }}>{label}</div>
+
+      {helper ? <div style={{ marginTop: 8, fontSize: 14, color: '#8a96ad' }}>{helper}</div> : null}
     </div>
-  )
-}
-
-function InfoBox({
-  title,
-  children
-}: {
-  title: string
-  children: React.ReactNode
-}) {
-  return (
-    <section
-      style={{
-        background: '#ffffff',
-        borderRadius: 28,
-        boxShadow: '0 14px 40px rgba(21,37,69,0.08)',
-        overflow: 'hidden'
-      }}
-    >
-      <div style={{ padding: 24, borderBottom: '1px solid #e5ebf5' }}>
-        <h2 style={{ margin: 0, fontSize: 34, lineHeight: 1.05, color: '#182847' }}>{title}</h2>
-      </div>
-      <div style={{ padding: 24 }}>{children}</div>
-    </section>
-  )
-}
-
-function Badge({
-  text,
-  background,
-  color
-}: {
-  text: string
-  background: string
-  color: string
-}) {
-  return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        padding: '10px 14px',
-        borderRadius: 999,
-        background,
-        color,
-        fontWeight: 900,
-        fontSize: 14
-      }}
-    >
-      {text}
-    </span>
   )
 }
 
@@ -491,9 +364,7 @@ export default function PlayerPage() {
     player: null,
     team: null,
     club: null,
-    result: null,
-    teamResults: [],
-    teamPlayers: []
+    result: null
   })
 
   useEffect(() => {
@@ -503,15 +374,20 @@ export default function PlayerPage() {
       try {
         setState((prev) => ({ ...prev, loading: true, error: '' }))
 
-        if (!playerId) throw new Error('Identifiant joueur manquant.')
+        if (!playerId) {
+          throw new Error('Identifiant joueur manquant.')
+        }
 
         const { data: playerData, error: playerError } = await supabase
           .from('players')
           .select('*')
           .eq('id', playerId)
-          .single()
+          .maybeSingle()
 
-        if (playerError) throw playerError
+        if (playerError) {
+          throw new Error(`players: ${playerError.message}`)
+        }
+
         const player = (playerData as Player | null) ?? null
 
         if (!player) {
@@ -520,8 +396,6 @@ export default function PlayerPage() {
 
         let team: Team | null = null
         let club: Club | null = null
-        let teamResults: Result[] = []
-        let teamPlayers: TeamPlayerLite[] = []
 
         if (player.team_id) {
           const { data: teamData, error: teamError } = await supabase
@@ -530,7 +404,10 @@ export default function PlayerPage() {
             .eq('id', player.team_id)
             .maybeSingle()
 
-          if (teamError) throw teamError
+          if (teamError) {
+            throw new Error(`teams: ${teamError.message}`)
+          }
+
           team = (teamData as Team | null) ?? null
 
           if (team?.club_id) {
@@ -540,41 +417,15 @@ export default function PlayerPage() {
               .eq('id', team.club_id)
               .maybeSingle()
 
-            if (clubError) throw clubError
-            club = (clubData as Club | null) ?? null
-          }
-
-          const { data: teamPlayersData, error: teamPlayersError } = await supabase
-            .from('players')
-            .select('id, firstname, lastname')
-            .eq('team_id', player.team_id)
-
-          if (teamPlayersError) throw teamPlayersError
-          teamPlayers = (teamPlayersData as TeamPlayerLite[] | null) ?? []
-
-          const teamPlayerIds = teamPlayers.map((p) => p.id)
-
-          if (teamPlayerIds.length > 0) {
-            const { data: allTeamResultsData, error: allTeamResultsError } = await supabase
-              .from('cmp_results')
-              .select('*')
-              .in('player_id', teamPlayerIds)
-              .order('created_at', { ascending: false })
-
-            if (allTeamResultsError) throw allTeamResultsError
-
-            const allTeamResults = (allTeamResultsData as Result[] | null) ?? []
-            const latestByPlayer = new Map<string, Result>()
-
-            for (const item of allTeamResults) {
-              const pid = typeof item.player_id === 'string' ? item.player_id : null
-              if (!pid) continue
-              if (!latestByPlayer.has(pid)) latestByPlayer.set(pid, item)
+            if (clubError) {
+              throw new Error(`clubs: ${clubError.message}`)
             }
 
-            teamResults = Array.from(latestByPlayer.values())
+            club = (clubData as Club | null) ?? null
           }
         }
+
+        let result: Result | null = null
 
         const { data: resultData, error: resultError } = await supabase
           .from('cmp_results')
@@ -583,8 +434,11 @@ export default function PlayerPage() {
           .order('created_at', { ascending: false })
           .limit(1)
 
-        if (resultError) throw resultError
-        const result = ((resultData as Result[] | null) ?? [])[0] ?? null
+        if (resultError) {
+          throw new Error(`cmp_results: ${resultError.message}`)
+        }
+
+        result = ((resultData as Result[] | null) ?? [])[0] ?? null
 
         if (!cancelled) {
           setState({
@@ -593,24 +447,18 @@ export default function PlayerPage() {
             player,
             team,
             club,
-            result,
-            teamResults,
-            teamPlayers
+            result
           })
         }
       } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : 'Erreur inconnue.'
-
         if (!cancelled) {
           setState({
             loading: false,
-            error: message,
+            error: getErrorMessage(error),
             player: null,
             team: null,
             club: null,
-            result: null,
-            teamResults: [],
-            teamPlayers: []
+            result: null
           })
         }
       }
@@ -625,31 +473,7 @@ export default function PlayerPage() {
 
   const radar = useMemo(() => extractRadar(state.result), [state.result])
   const globalScore = normalize(state.result?.score_global)
-
-  const teamScores = useMemo(
-    () =>
-      state.teamResults
-        .map((item) => normalize(item.score_global))
-        .filter((v): v is number => v !== null),
-    [state.teamResults]
-  )
-
-  const teamAverage = useMemo(() => {
-    if (teamScores.length === 0) return null
-    return Math.round(teamScores.reduce((sum, value) => sum + value, 0) / teamScores.length)
-  }, [teamScores])
-
-  const gapVsTeam = globalScore !== null && teamAverage !== null ? globalScore - teamAverage : null
-  const percentileText = getPercentileText(globalScore, teamScores)
   const coachInsight = getCoachInsight(globalScore, radar)
-  const progressAxes = getProgressAxes(radar, globalScore)
-  const ranking = useMemo(
-    () => buildTeamRanking(state.teamPlayers, state.teamResults, playerId),
-    [state.teamPlayers, state.teamResults, playerId]
-  )
-
-  const playerRank = ranking.findIndex((row) => row.playerId === playerId) + 1
-  const readinessLabel = getReadinessLabel(globalScore)
 
   if (state.loading) {
     return <div style={{ padding: 20 }}>Chargement...</div>
@@ -672,7 +496,7 @@ export default function PlayerPage() {
   return (
     <main
       style={{
-        maxWidth: 1420,
+        maxWidth: 1200,
         margin: '0 auto',
         padding: 24,
         background: '#eef2f7'
@@ -687,15 +511,7 @@ export default function PlayerPage() {
           marginBottom: 24
         }}
       >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            gap: 20,
-            flexWrap: 'wrap',
-            alignItems: 'flex-start'
-          }}
-        >
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' }}>
           <div>
             <div
               style={{
@@ -710,59 +526,32 @@ export default function PlayerPage() {
               Fiche joueur premium A4P
             </div>
 
-            <h1
-              style={{
-                margin: 0,
-                fontSize: 54,
-                lineHeight: 1.02,
-                color: '#182847',
-                maxWidth: 860
-              }}
-            >
+            <h1 style={{ margin: 0, fontSize: 46, lineHeight: 1.02, color: '#182847' }}>
               {getPlayerName(state.player)}
             </h1>
 
-            <p
-              style={{
-                margin: '18px 0 0 0',
-                fontSize: 21,
-                lineHeight: 1.75,
-                color: '#5f6f8e',
-                maxWidth: 980
-              }}
-            >
-              Lecture mentale individuelle, repérage des leviers prioritaires, préparation du staff
-              et positionnement par rapport à l’équipe.
+            <p style={{ margin: '16px 0 0 0', fontSize: 18, lineHeight: 1.7, color: '#5f6f8e' }}>
+              Club : {getClubName(state.club)} · Équipe : {getTeamName(state.team)} · Email : {state.player.email || '—'}
             </p>
-
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 18 }}>
-              <Badge text={`Club : ${getClubName(state.club)}`} background="#eef2ff" color="#34518b" />
-              <Badge text={`Équipe : ${getTeamName(state.team)}`} background="#eef2ff" color="#34518b" />
-              <Badge text={`Email : ${state.player.email || '—'}`} background="#eef2ff" color="#34518b" />
-            </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <Badge text={`État : ${readinessLabel}`} background="#ecfdf3" color="#067647" />
-            <Link
-              href="/club"
-              style={{
-                textDecoration: 'none',
-                padding: '14px 20px',
-                borderRadius: 16,
-                color: '#ffffff',
-                background: 'linear-gradient(135deg, #2f4d85 0%, #4168b0 100%)',
-                fontWeight: 800,
-                fontSize: 16,
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 12px 26px rgba(47,77,133,0.22)'
-              }}
-            >
-              Retour club
-            </Link>
-          </div>
+          <Link
+            href="/club"
+            style={{
+              textDecoration: 'none',
+              padding: '14px 20px',
+              borderRadius: 16,
+              color: '#ffffff',
+              background: 'linear-gradient(135deg, #2f4d85 0%, #4168b0 100%)',
+              fontWeight: 800,
+              fontSize: 16,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            Retour club
+          </Link>
         </div>
       </section>
 
@@ -776,242 +565,55 @@ export default function PlayerPage() {
       >
         <StatCard value={globalScore !== null ? `${globalScore}/100` : '—'} label="score global" helper={getLevel(globalScore)} />
         <StatCard value={state.result?.profile_label || state.result?.profile_code || '—'} label="profil mental" helper="lecture actuelle" />
-        <StatCard value={teamAverage !== null ? `${teamAverage}/100` : '—'} label="moyenne équipe" helper="référence collective" />
-        <StatCard value={gapVsTeam !== null ? `${gapVsTeam > 0 ? '+' : ''}${gapVsTeam}` : '—'} label="écart équipe" helper={percentileText} />
-      </section>
-
-      <section
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: 18,
-          marginBottom: 24
-        }}
-      >
-        <StatCard value={playerRank > 0 ? `#${playerRank}` : '—'} label="rang équipe" helper="classement score global" />
-        <StatCard value={ranking.length} label="joueurs classés" helper="base disponible" />
         <StatCard value={formatDate(state.result?.created_at)} label="dernière mesure" helper="date résultat" />
-        <StatCard value={readinessLabel} label="niveau de préparation" helper="lecture staff" />
+        <StatCard value={radar ? 'Oui' : 'Non'} label="radar détaillé" helper="dimensions disponibles" />
       </section>
 
       <section
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))',
-          gap: 24,
-          marginBottom: 24
+          gap: 24
         }}
       >
-        <InfoBox title="Analyse coach">
-          <>
+        <div
+          style={{
+            background: '#ffffff',
+            borderRadius: 28,
+            boxShadow: '0 14px 40px rgba(21,37,69,0.08)',
+            overflow: 'hidden'
+          }}
+        >
+          <div style={{ padding: 24, borderBottom: '1px solid #e5ebf5' }}>
+            <h2 style={{ margin: 0, fontSize: 34, lineHeight: 1.05, color: '#182847' }}>
+              Analyse coach
+            </h2>
+          </div>
+          <div style={{ padding: 24 }}>
             <p style={{ margin: 0, fontSize: 18, lineHeight: 1.8, color: '#5f6f8e' }}>
               {coachInsight}
             </p>
+          </div>
+        </div>
 
-            <div
-              style={{
-                marginTop: 18,
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                gap: 12
-              }}
-            >
-              <StatCard value={percentileText} label="positionnement équipe" helper="lecture comparative" />
-              <StatCard value={state.teamResults.length} label="résultats équipe" helper="base collective" />
-            </div>
-          </>
-        </InfoBox>
-
-        <InfoBox title="Radar mental">
-          <>
+        <div
+          style={{
+            background: '#ffffff',
+            borderRadius: 28,
+            boxShadow: '0 14px 40px rgba(21,37,69,0.08)',
+            overflow: 'hidden'
+          }}
+        >
+          <div style={{ padding: 24, borderBottom: '1px solid #e5ebf5' }}>
+            <h2 style={{ margin: 0, fontSize: 34, lineHeight: 1.05, color: '#182847' }}>
+              Radar mental
+            </h2>
+          </div>
+          <div style={{ padding: 24 }}>
             <RadarChart radar={radar} />
-
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                gap: 12,
-                marginTop: 18
-              }}
-            >
-              <StatCard value={radar ? `${radar.confiance}/100` : '—'} label="confiance" />
-              <StatCard value={radar ? `${radar.regulation}/100` : '—'} label="régulation" />
-              <StatCard value={radar ? `${radar.engagement}/100` : '—'} label="engagement" />
-              <StatCard value={radar ? `${radar.stabilite}/100` : '—'} label="stabilité" />
-            </div>
-          </>
-        </InfoBox>
-      </section>
-
-      <section
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))',
-          gap: 24,
-          marginBottom: 24
-        }}
-      >
-        <InfoBox title="Axes de progression prioritaires">
-          <>
-            <div style={{ display: 'grid', gap: 14 }}>
-              {progressAxes.map((item, index) => (
-                <div
-                  key={`${item}-${index}`}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '52px 1fr',
-                    gap: 16,
-                    alignItems: 'start',
-                    padding: 18,
-                    borderRadius: 20,
-                    background: '#f8fafd',
-                    border: '1px solid #e1e8f3'
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 52,
-                      height: 52,
-                      borderRadius: 999,
-                      background: '#eef2ff',
-                      color: '#34518b',
-                      fontWeight: 900,
-                      fontSize: 22,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    {index + 1}
-                  </div>
-
-                  <div
-                    style={{
-                      fontSize: 17,
-                      lineHeight: 1.75,
-                      color: '#44516d',
-                      fontWeight: 700
-                    }}
-                  >
-                    {item}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        </InfoBox>
-
-        <InfoBox title="Synthèse staff">
-          <>
-            <div style={{ display: 'grid', gap: 14 }}>
-              <div
-                style={{
-                  padding: 18,
-                  borderRadius: 20,
-                  background: '#f8fafd',
-                  border: '1px solid #e1e8f3',
-                  color: '#44516d',
-                  lineHeight: 1.8,
-                  fontWeight: 700
-                }}
-              >
-                Niveau actuel : {getLevel(globalScore)}.
-              </div>
-
-              <div
-                style={{
-                  padding: 18,
-                  borderRadius: 20,
-                  background: '#f8fafd',
-                  border: '1px solid #e1e8f3',
-                  color: '#44516d',
-                  lineHeight: 1.8,
-                  fontWeight: 700
-                }}
-              >
-                Positionnement équipe : {percentileText}.
-              </div>
-
-              <div
-                style={{
-                  padding: 18,
-                  borderRadius: 20,
-                  background: '#f8fafd',
-                  border: '1px solid #e1e8f3',
-                  color: '#44516d',
-                  lineHeight: 1.8,
-                  fontWeight: 700
-                }}
-              >
-                Priorité coach : transformer les axes faibles en routines observables à l’entraînement et en compétition.
-              </div>
-            </div>
-          </>
-        </InfoBox>
-      </section>
-
-      <InfoBox title="Classement équipe">
-        {ranking.length === 0 ? (
-          <div style={{ color: '#667085', lineHeight: 1.7 }}>
-            Classement indisponible : pas assez de résultats équipe.
           </div>
-        ) : (
-          <div style={{ display: 'grid', gap: 12 }}>
-            {ranking.slice(0, 10).map((row, index) => (
-              <div
-                key={row.playerId}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '64px 1fr 120px',
-                  gap: 16,
-                  alignItems: 'center',
-                  padding: 16,
-                  borderRadius: 18,
-                  border: row.isCurrentPlayer ? '2px solid #9cb5e8' : '1px solid #e1e8f3',
-                  background: row.isCurrentPlayer ? '#eef4ff' : '#f8fafd'
-                }}
-              >
-                <div
-                  style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: 999,
-                    background: '#ffffff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 900,
-                    color: '#20335d',
-                    boxShadow: '0 6px 18px rgba(23,37,69,0.08)'
-                  }}
-                >
-                  #{index + 1}
-                </div>
-
-                <div>
-                  <div style={{ fontWeight: 900, color: '#20335d', fontSize: 17 }}>
-                    {row.name}
-                  </div>
-                  <div style={{ color: '#667085', fontSize: 14 }}>
-                    {row.isCurrentPlayer ? 'Joueur affiché' : 'Autre joueur équipe'}
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    justifySelf: 'end',
-                    fontWeight: 900,
-                    fontSize: 20,
-                    color: '#20335d'
-                  }}
-                >
-                  {row.score !== null ? `${row.score}/100` : '—'}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </InfoBox>
+        </div>
+      </section>
     </main>
   )
 }
