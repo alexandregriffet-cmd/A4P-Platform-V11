@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
@@ -60,14 +60,37 @@ type ResultBase = {
   created_at?: string | null
 }
 
+type CMPResult = ResultBase & {
+  profile_label?: string | null
+  confidence?: number | string | null
+  regulation?: number | string | null
+  engagement?: number | string | null
+  stability?: number | string | null
+}
+
+type PMPResult = ResultBase & {
+  profile_label?: string | null
+  decision_style?: string | null
+  focus_mode?: string | null
+  strong_points?: string | null
+  vigilance_points?: string | null
+}
+
 type PsychoResult = {
   id?: string | null
   player_id?: string | null
   club_id?: string | null
   team_id?: string | null
+  profile_label?: string | null
   stress_level?: number | string | null
+  confidence_level?: number | string | null
+  emotional_control?: number | string | null
+  fear_factor?: number | string | null
+  blockages?: string | null
   created_at?: string | null
 }
+
+type PlayerStatus = 'top' | 'stable' | 'watch' | 'risk'
 
 type PageState = {
   loading: boolean
@@ -77,11 +100,8 @@ type PageState = {
   visibleClubs: Club[]
   visibleTeams: Team[]
   visiblePlayers: Player[]
-  cmpAverage: number | null
-  pmpAverage: number | null
-  stressAverage: number | null
-  cmpByPlayer: Map<string, ResultBase>
-  pmpByPlayer: Map<string, ResultBase>
+  cmpByPlayer: Map<string, CMPResult>
+  pmpByPlayer: Map<string, PMPResult>
   psychoByPlayer: Map<string, PsychoResult>
 }
 
@@ -166,12 +186,167 @@ function SectionCard({
         boxShadow: '0 10px 30px rgba(20,30,60,0.08)'
       }}
     >
-      <h2 style={{ marginTop: 0, marginBottom: 18, fontSize: 30, color: '#182847' }}>
-        {title}
-      </h2>
+      <h2 style={{ marginTop: 0, marginBottom: 18, fontSize: 30, color: '#182847' }}>{title}</h2>
       {children}
     </div>
   )
+}
+
+function BulletList({ items }: { items: string[] }) {
+  if (items.length === 0) {
+    return <p style={{ margin: 0, color: '#667085' }}>Aucun élément disponible.</p>
+  }
+
+  return (
+    <div style={{ display: 'grid', gap: 10 }}>
+      {items.map((item, index) => (
+        <div
+          key={`${index}-${item}`}
+          style={{
+            background: '#f8fbff',
+            border: '1px solid #e2e8f4',
+            borderRadius: 16,
+            padding: 14,
+            color: '#44516d',
+            lineHeight: 1.6
+          }}
+        >
+          {item}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function RadarBlock({
+  confidence,
+  regulation,
+  engagement,
+  stability
+}: {
+  confidence: number | null
+  regulation: number | null
+  engagement: number | null
+  stability: number | null
+}) {
+  const size = 260
+  const center = size / 2
+  const radius = 95
+
+  const valueOrZero = (v: number | null) => (v ?? 0) / 100
+
+  const top = {
+    x: center,
+    y: center - radius * valueOrZero(confidence)
+  }
+  const right = {
+    x: center + radius * valueOrZero(regulation),
+    y: center
+  }
+  const bottom = {
+    x: center,
+    y: center + radius * valueOrZero(engagement)
+  }
+  const left = {
+    x: center - radius * valueOrZero(stability),
+    y: center
+  }
+
+  const points = `${top.x},${top.y} ${right.x},${right.y} ${bottom.x},${bottom.y} ${left.x},${left.y}`
+
+  return (
+    <div
+      style={{
+        background: '#ffffff',
+        borderRadius: 24,
+        padding: 24,
+        boxShadow: '0 10px 30px rgba(20,30,60,0.08)'
+      }}
+    >
+      <h2 style={{ marginTop: 0, marginBottom: 18, fontSize: 30, color: '#182847' }}>
+        Radar collectif A4P
+      </h2>
+
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          <polygon
+            points={`${center},${center - radius} ${center + radius},${center} ${center},${center + radius} ${center - radius},${center}`}
+            fill="none"
+            stroke="#d5deee"
+            strokeWidth="1.2"
+          />
+          <polygon
+            points={`${center},${center - radius * 0.75} ${center + radius * 0.75},${center} ${center},${center + radius * 0.75} ${center - radius * 0.75},${center}`}
+            fill="none"
+            stroke="#d5deee"
+            strokeWidth="1"
+          />
+          <polygon
+            points={`${center},${center - radius * 0.5} ${center + radius * 0.5},${center} ${center},${center + radius * 0.5} ${center - radius * 0.5},${center}`}
+            fill="none"
+            stroke="#d5deee"
+            strokeWidth="1"
+          />
+          <polygon
+            points={`${center},${center - radius * 0.25} ${center + radius * 0.25},${center} ${center},${center + radius * 0.25} ${center - radius * 0.25},${center}`}
+            fill="none"
+            stroke="#d5deee"
+            strokeWidth="1"
+          />
+
+          <line x1={center} y1={center - radius} x2={center} y2={center + radius} stroke="#d5deee" />
+          <line x1={center - radius} y1={center} x2={center + radius} y2={center} stroke="#d5deee" />
+
+          <polygon points={points} fill="rgba(53,82,143,0.18)" stroke="#35528f" strokeWidth="4" />
+
+          <circle cx={top.x} cy={top.y} r="4" fill="#35528f" />
+          <circle cx={right.x} cy={right.y} r="4" fill="#35528f" />
+          <circle cx={bottom.x} cy={bottom.y} r="4" fill="#35528f" />
+          <circle cx={left.x} cy={left.y} r="4" fill="#35528f" />
+
+          <text x={center} y={20} textAnchor="middle" fontSize="15" fill="#667085" fontWeight="700">
+            Confiance
+          </text>
+          <text x={size - 18} y={center + 5} textAnchor="end" fontSize="15" fill="#667085" fontWeight="700">
+            Régulation
+          </text>
+          <text x={center} y={size - 14} textAnchor="middle" fontSize="15" fill="#667085" fontWeight="700">
+            Engagement
+          </text>
+          <text x={18} y={center + 5} textAnchor="start" fontSize="15" fill="#667085" fontWeight="700">
+            Stabilité
+          </text>
+        </svg>
+      </div>
+
+      <div
+        style={{
+          marginTop: 18,
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+          gap: 12
+        }}
+      >
+        <div style={{ color: '#44516d' }}><strong>Confiance :</strong> {confidence !== null ? `${confidence}/100` : '—'}</div>
+        <div style={{ color: '#44516d' }}><strong>Régulation :</strong> {regulation !== null ? `${regulation}/100` : '—'}</div>
+        <div style={{ color: '#44516d' }}><strong>Engagement :</strong> {engagement !== null ? `${engagement}/100` : '—'}</div>
+        <div style={{ color: '#44516d' }}><strong>Stabilité :</strong> {stability !== null ? `${stability}/100` : '—'}</div>
+      </div>
+    </div>
+  )
+}
+
+function statusMeta(status: PlayerStatus) {
+  if (status === 'top') {
+    return { label: 'Top mental', bg: '#e9f7ef', border: '#cfead9', color: '#1f6b43' }
+  }
+  if (status === 'stable') {
+    return { label: 'Stable', bg: '#edf4ff', border: '#d8e5ff', color: '#35528f' }
+  }
+  if (status === 'watch') {
+    return { label: 'À accompagner', bg: '#fff7e8', border: '#f6e2b8', color: '#9a6b00' }
+  }
+  return { label: 'À risque', bg: '#fff0f0', border: '#f2c9c9', color: '#9f2f2f' }
 }
 
 export default function ClubPage() {
@@ -183,9 +358,6 @@ export default function ClubPage() {
     visibleClubs: [],
     visibleTeams: [],
     visiblePlayers: [],
-    cmpAverage: null,
-    pmpAverage: null,
-    stressAverage: null,
     cmpByPlayer: new Map(),
     pmpByPlayer: new Map(),
     psychoByPlayer: new Map()
@@ -203,9 +375,7 @@ export default function ClubPage() {
           error: userError
         } = await supabase.auth.getUser()
 
-        if (userError) {
-          throw new Error(userError.message)
-        }
+        if (userError) throw new Error(userError.message)
 
         if (!user) {
           if (!cancelled) {
@@ -251,8 +421,8 @@ export default function ClubPage() {
         const clubs = (clubsRes.data as Club[] | null) ?? []
         const teams = (teamsRes.data as Team[] | null) ?? []
         const players = (playersRes.data as Player[] | null) ?? []
-        const cmpResults = (cmpRes.data as ResultBase[] | null) ?? []
-        const pmpResults = (pmpRes.data as ResultBase[] | null) ?? []
+        const cmpResults = (cmpRes.data as CMPResult[] | null) ?? []
+        const pmpResults = (pmpRes.data as PMPResult[] | null) ?? []
         const psychoResults = (psychoRes.data as PsychoResult[] | null) ?? []
 
         if (!selectedUser) {
@@ -286,19 +456,14 @@ export default function ClubPage() {
           visiblePlayers = players.filter((player) => player.team_id === selectedUser.team_id)
         } else if (selectedUser.role === 'player') {
           visibleClubs = clubs.filter((club) => club.id === selectedUser.club_id)
-
           const myPlayer = players.find((p) => p.club_user_id === selectedUser.id)
-
-          visibleTeams = myPlayer?.team_id
-            ? teams.filter((team) => team.id === myPlayer.team_id)
-            : []
-
+          visibleTeams = myPlayer?.team_id ? teams.filter((team) => team.id === myPlayer.team_id) : []
           visiblePlayers = players.filter((player) => player.club_user_id === selectedUser.id)
         }
 
         const visiblePlayerIds = visiblePlayers.map((p) => p.id)
 
-        const cmpByPlayer = new Map<string, ResultBase>()
+        const cmpByPlayer = new Map<string, CMPResult>()
         for (const item of cmpResults) {
           const pid = typeof item.player_id === 'string' ? item.player_id : null
           if (pid && visiblePlayerIds.includes(pid) && !cmpByPlayer.has(pid)) {
@@ -306,7 +471,7 @@ export default function ClubPage() {
           }
         }
 
-        const pmpByPlayer = new Map<string, ResultBase>()
+        const pmpByPlayer = new Map<string, PMPResult>()
         for (const item of pmpResults) {
           const pid = typeof item.player_id === 'string' ? item.player_id : null
           if (pid && visiblePlayerIds.includes(pid) && !pmpByPlayer.has(pid)) {
@@ -322,18 +487,6 @@ export default function ClubPage() {
           }
         }
 
-        const cmpAverage = average(
-          visiblePlayers.map((p) => normalizeScore(cmpByPlayer.get(p.id)?.score_global))
-        )
-
-        const pmpAverage = average(
-          visiblePlayers.map((p) => normalizeScore(pmpByPlayer.get(p.id)?.score_global))
-        )
-
-        const stressAverage = average(
-          visiblePlayers.map((p) => normalizeScore(psychoByPlayer.get(p.id)?.stress_level))
-        )
-
         if (!cancelled) {
           setState({
             loading: false,
@@ -343,9 +496,6 @@ export default function ClubPage() {
             visibleClubs,
             visibleTeams,
             visiblePlayers,
-            cmpAverage,
-            pmpAverage,
-            stressAverage,
             cmpByPlayer,
             pmpByPlayer,
             psychoByPlayer
@@ -392,6 +542,137 @@ export default function ClubPage() {
 
     alert('Regarde tes emails pour te connecter')
   }
+
+  const metrics = useMemo(() => {
+    const cmpValues = state.visiblePlayers.map((p) => normalizeScore(state.cmpByPlayer.get(p.id)?.score_global))
+    const pmpValues = state.visiblePlayers.map((p) => normalizeScore(state.pmpByPlayer.get(p.id)?.score_global))
+    const stressValues = state.visiblePlayers.map((p) => normalizeScore(state.psychoByPlayer.get(p.id)?.stress_level))
+    const confidenceValues = state.visiblePlayers.map((p) => normalizeScore(state.cmpByPlayer.get(p.id)?.confidence))
+    const regulationValues = state.visiblePlayers.map((p) => normalizeScore(state.cmpByPlayer.get(p.id)?.regulation))
+    const engagementValues = state.visiblePlayers.map((p) => normalizeScore(state.cmpByPlayer.get(p.id)?.engagement))
+    const stabilityValues = state.visiblePlayers.map((p) => normalizeScore(state.cmpByPlayer.get(p.id)?.stability))
+
+    return {
+      cmpAverage: average(cmpValues),
+      pmpAverage: average(pmpValues),
+      stressAverage: average(stressValues),
+      confidenceAverage: average(confidenceValues),
+      regulationAverage: average(regulationValues),
+      engagementAverage: average(engagementValues),
+      stabilityAverage: average(stabilityValues)
+    }
+  }, [state.visiblePlayers, state.cmpByPlayer, state.pmpByPlayer, state.psychoByPlayer])
+
+  const segmentedPlayers = useMemo(() => {
+    return state.visiblePlayers
+      .map((player) => {
+        const cmp = normalizeScore(state.cmpByPlayer.get(player.id)?.score_global)
+        const pmp = normalizeScore(state.pmpByPlayer.get(player.id)?.score_global)
+        const stress = normalizeScore(state.psychoByPlayer.get(player.id)?.stress_level)
+        const regulation = normalizeScore(state.cmpByPlayer.get(player.id)?.regulation)
+
+        let status: PlayerStatus = 'stable'
+
+        if ((cmp !== null && cmp >= 78) && (pmp !== null && pmp >= 75) && (stress === null || stress <= 60)) {
+          status = 'top'
+        } else if ((cmp !== null && cmp < 60) || (stress !== null && stress >= 75)) {
+          status = 'risk'
+        } else if ((stress !== null && stress >= 65) || (regulation !== null && regulation < 65)) {
+          status = 'watch'
+        } else {
+          status = 'stable'
+        }
+
+        return { player, cmp, pmp, stress, regulation, status }
+      })
+      .sort((a, b) => {
+        const rank = { top: 0, stable: 1, watch: 2, risk: 3 }
+        return rank[a.status] - rank[b.status]
+      })
+  }, [state.visiblePlayers, state.cmpByPlayer, state.pmpByPlayer, state.psychoByPlayer])
+
+  const segmentationCounts = useMemo(() => {
+    return {
+      top: segmentedPlayers.filter((p) => p.status === 'top').length,
+      stable: segmentedPlayers.filter((p) => p.status === 'stable').length,
+      watch: segmentedPlayers.filter((p) => p.status === 'watch').length,
+      risk: segmentedPlayers.filter((p) => p.status === 'risk').length
+    }
+  }, [segmentedPlayers])
+
+  const coachRecommendations = useMemo(() => {
+    const items: string[] = []
+
+    if ((metrics.stressAverage ?? 0) >= 65) {
+      items.push("Mettre en place des routines collectives de respiration, recentrage et retour au calme avant les temps forts.")
+    }
+    if ((metrics.regulationAverage ?? 100) < 65) {
+      items.push("Structurer les feedbacks coach avec des consignes brèves, concrètes et orientées vers la prochaine action.")
+    }
+    if ((metrics.stabilityAverage ?? 100) < 60) {
+      items.push("Installer des rituels entre les séquences pour maintenir une continuité mentale et éviter les décrochages.")
+    }
+    if ((metrics.engagementAverage ?? 100) < 70) {
+      items.push("Clarifier les intentions collectives et les rôles pour soutenir l'engagement du groupe dans la durée.")
+    }
+    if ((metrics.confidenceAverage ?? 100) < 70) {
+      items.push("Renforcer la confiance collective en s'appuyant sur des repères de progrès observables et répétés.")
+    }
+    if (segmentationCounts.risk > 0) {
+      items.push(`Prévoir un accompagnement renforcé pour ${segmentationCounts.risk} joueur(s) actuellement classé(s) à risque.`)
+    }
+    if (items.length === 0) {
+      items.push("L'équipe présente une base fonctionnelle satisfaisante. L'enjeu principal est désormais la consolidation et le suivi dans le temps.")
+    }
+
+    return items.slice(0, 5)
+  }, [metrics, segmentationCounts])
+
+  const collectiveSynthesis = useMemo(() => {
+    const items: string[] = []
+
+    if (metrics.cmpAverage !== null) {
+      if (metrics.cmpAverage >= 75) {
+        items.push(`Le socle mental collectif apparaît solide avec une moyenne CMP de ${metrics.cmpAverage}/100.`)
+      } else if (metrics.cmpAverage >= 60) {
+        items.push(`Le socle mental collectif reste correct mais encore irrégulier avec une moyenne CMP de ${metrics.cmpAverage}/100.`)
+      } else {
+        items.push(`Le socle mental collectif semble fragile avec une moyenne CMP de ${metrics.cmpAverage}/100.`)
+      }
+    }
+
+    if (metrics.pmpAverage !== null) {
+      if (metrics.pmpAverage >= 75) {
+        items.push("Les profils PMP suggèrent une équipe capable de se mobiliser vite et de produire de l'intention dans l'action.")
+      } else {
+        items.push("Les profils PMP montrent un collectif qui doit encore clarifier ses repères de décision et son fonctionnement dominant.")
+      }
+    }
+
+    if (metrics.stressAverage !== null) {
+      if (metrics.stressAverage >= 70) {
+        items.push(`Le niveau de stress moyen est élevé (${metrics.stressAverage}/100), avec un risque de dégradation de la lucidité en compétition.`)
+      } else if (metrics.stressAverage >= 55) {
+        items.push(`Le stress moyen reste présent (${metrics.stressAverage}/100) et peut dégrader la constance dans les moments à enjeu.`)
+      } else {
+        items.push(`Le stress moyen reste plutôt maîtrisé (${metrics.stressAverage}/100), ce qui constitue un appui collectif intéressant.`)
+      }
+    }
+
+    if ((metrics.regulationAverage ?? 100) < 65) {
+      items.push("La régulation émotionnelle collective doit être structurée pour limiter les variations de performance sous pression.")
+    }
+
+    if (segmentationCounts.top > 0) {
+      items.push(`${segmentationCounts.top} joueur(s) ressort(ent) comme top mental et peuvent servir de points d'appui dans le groupe.`)
+    }
+
+    if (items.length === 0) {
+      items.push("Les données restent encore trop partielles pour une lecture collective complète.")
+    }
+
+    return items
+  }, [metrics, segmentationCounts])
 
   if (state.loading) {
     return <div style={{ padding: 24 }}>Chargement...</div>
@@ -475,10 +756,7 @@ export default function ClubPage() {
         <StatCard value={state.visibleClubs.length} label="Clubs visibles" />
         <StatCard value={state.visibleTeams.length} label="Équipes visibles" />
         <StatCard value={state.visiblePlayers.length} label="Joueurs visibles" />
-        <StatCard
-          value={state.cmpAverage !== null ? `${state.cmpAverage}/100` : '—'}
-          label="Moyenne CMP visible"
-        />
+        <StatCard value={metrics.cmpAverage !== null ? `${metrics.cmpAverage}/100` : '—'} label="Moyenne CMP" />
       </section>
 
       <section
@@ -489,16 +767,10 @@ export default function ClubPage() {
           marginBottom: 24
         }}
       >
-        <StatCard
-          value={state.pmpAverage !== null ? `${state.pmpAverage}/100` : '—'}
-          label="Moyenne PMP visible"
-        />
-        <StatCard
-          value={state.stressAverage !== null ? `${state.stressAverage}/100` : '—'}
-          label="Stress moyen visible"
-        />
-        <StatCard value={state.selectedUser?.club_id ? 'Oui' : 'Non'} label="Club attribué" />
-        <StatCard value={state.selectedUser?.team_id ? 'Oui' : 'Non'} label="Équipe attribuée" />
+        <StatCard value={metrics.pmpAverage !== null ? `${metrics.pmpAverage}/100` : '—'} label="Moyenne PMP" />
+        <StatCard value={metrics.stressAverage !== null ? `${metrics.stressAverage}/100` : '—'} label="Stress moyen" />
+        <StatCard value={segmentationCounts.top} label="Top mental" helper="Joueurs moteurs du groupe" />
+        <StatCard value={segmentationCounts.risk} label="À risque" helper="Joueurs à sécuriser en priorité" />
       </section>
 
       <section
@@ -509,40 +781,45 @@ export default function ClubPage() {
           marginBottom: 24
         }}
       >
-        <SectionCard title="Périmètre visible">
-          <div style={{ display: 'grid', gap: 12 }}>
-            <p style={{ margin: 0, lineHeight: 1.8, color: '#44516d' }}>
-              <strong>Rôle :</strong> {state.selectedUser?.role || '—'}
-            </p>
-            <p style={{ margin: 0, lineHeight: 1.8, color: '#44516d' }}>
-              <strong>Clubs :</strong>{' '}
-              {state.visibleClubs.length > 0
-                ? state.visibleClubs.map((c) => c.name || 'Club').join(', ')
-                : 'Aucun'}
-            </p>
-            <p style={{ margin: 0, lineHeight: 1.8, color: '#44516d' }}>
-              <strong>Équipes :</strong>{' '}
-              {state.visibleTeams.length > 0
-                ? state.visibleTeams.map((t) => t.name || 'Équipe').join(', ')
-                : 'Aucune'}
-            </p>
-            <p style={{ margin: 0, lineHeight: 1.8, color: '#44516d' }}>
-              <strong>Joueurs visibles :</strong> {state.visiblePlayers.length}
-            </p>
-          </div>
+        <RadarBlock
+          confidence={metrics.confidenceAverage}
+          regulation={metrics.regulationAverage}
+          engagement={metrics.engagementAverage}
+          stability={metrics.stabilityAverage}
+        />
+
+        <SectionCard title="Recommandations coach globales">
+          <BulletList items={coachRecommendations} />
+        </SectionCard>
+      </section>
+
+      <section
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))',
+          gap: 24,
+          marginBottom: 24
+        }}
+      >
+        <SectionCard title="Synthèse collective A4P">
+          <BulletList items={collectiveSynthesis} />
         </SectionCard>
 
-        <SectionCard title="Accès attendu">
-          <p style={{ margin: 0, lineHeight: 1.8, color: '#44516d' }}>
-            {state.selectedUser?.role === 'a4p_admin' &&
-              "L’administrateur A4P voit tous les clubs, toutes les équipes, tous les joueurs et toutes les données."}
-            {state.selectedUser?.role === 'club_admin' &&
-              "L’administrateur club voit uniquement son club, toutes ses équipes et tous ses joueurs."}
-            {state.selectedUser?.role === 'coach' &&
-              "Le coach voit uniquement son équipe, ses joueurs et la synthèse collective de son groupe."}
-            {state.selectedUser?.role === 'player' &&
-              "Le joueur voit uniquement ses propres résultats et son historique individuel."}
-          </p>
+        <SectionCard title="Segmentation automatique des joueurs">
+          <div style={{ display: 'grid', gap: 12 }}>
+            <div style={{ color: '#44516d', lineHeight: 1.7 }}>
+              <strong>Top mental :</strong> {segmentationCounts.top}
+            </div>
+            <div style={{ color: '#44516d', lineHeight: 1.7 }}>
+              <strong>Stable :</strong> {segmentationCounts.stable}
+            </div>
+            <div style={{ color: '#44516d', lineHeight: 1.7 }}>
+              <strong>À accompagner :</strong> {segmentationCounts.watch}
+            </div>
+            <div style={{ color: '#44516d', lineHeight: 1.7 }}>
+              <strong>À risque :</strong> {segmentationCounts.risk}
+            </div>
+          </div>
         </SectionCard>
       </section>
 
@@ -591,15 +868,13 @@ export default function ClubPage() {
 
       <div style={{ height: 24 }} />
 
-      <SectionCard title="Joueurs visibles">
-        {state.visiblePlayers.length === 0 ? (
+      <SectionCard title="Lecture club pro des joueurs">
+        {segmentedPlayers.length === 0 ? (
           <p style={{ margin: 0, color: '#667085' }}>Aucun joueur visible pour ce rôle.</p>
         ) : (
           <div style={{ display: 'grid', gap: 14 }}>
-            {state.visiblePlayers.map((player) => {
-              const cmp = normalizeScore(state.cmpByPlayer.get(player.id)?.score_global)
-              const pmp = normalizeScore(state.pmpByPlayer.get(player.id)?.score_global)
-              const stress = normalizeScore(state.psychoByPlayer.get(player.id)?.stress_level)
+            {segmentedPlayers.map(({ player, cmp, pmp, stress, status }) => {
+              const meta = statusMeta(status)
 
               return (
                 <div
@@ -628,6 +903,34 @@ export default function ClubPage() {
                       <div style={{ fontSize: 14, color: '#667085' }}>{player.email || '—'}</div>
                     </div>
 
+                    <div
+                      style={{
+                        background: meta.bg,
+                        border: `1px solid ${meta.border}`,
+                        color: meta.color,
+                        borderRadius: 999,
+                        padding: '8px 12px',
+                        fontWeight: 800
+                      }}
+                    >
+                      {meta.label}
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+                      gap: 12,
+                      marginBottom: 12
+                    }}
+                  >
+                    <StatCard value={cmp !== null ? `${cmp}/100` : '—'} label="CMP" />
+                    <StatCard value={pmp !== null ? `${pmp}/100` : '—'} label="PMP" />
+                    <StatCard value={stress !== null ? `${stress}/100` : '—'} label="Stress" />
+                  </div>
+
+                  <div style={{ marginTop: 10 }}>
                     <Link
                       href={`/club/joueurs/${player.id}`}
                       style={{
@@ -636,23 +939,12 @@ export default function ClubPage() {
                         borderRadius: 14,
                         color: '#ffffff',
                         background: '#35528f',
-                        fontWeight: 800
+                        fontWeight: 800,
+                        display: 'inline-block'
                       }}
                     >
                       Voir la fiche joueur
                     </Link>
-                  </div>
-
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-                      gap: 12
-                    }}
-                  >
-                    <StatCard value={cmp !== null ? `${cmp}/100` : '—'} label="CMP" />
-                    <StatCard value={pmp !== null ? `${pmp}/100` : '—'} label="PMP" />
-                    <StatCard value={stress !== null ? `${stress}/100` : '—'} label="Stress" />
                   </div>
                 </div>
               )
