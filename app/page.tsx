@@ -6,7 +6,7 @@ export default function HomePage() {
       style={{
         minHeight: '100vh',
         background: 'linear-gradient(180deg, #eef2f8 0%, #e9eef7 100%)',
-        padding: '32px 20px 48px',
+        padding: '32px 20px 56px',
         color: '#1f3158',
       }}
     >
@@ -19,26 +19,40 @@ export default function HomePage() {
         <section
           style={{
             background: 'linear-gradient(135deg, #223a6b 0%, #2d4d8e 100%)',
-            borderRadius: 28,
-            padding: '28px 24px',
-            boxShadow: '0 18px 48px rgba(31, 49, 88, 0.16)',
+            borderRadius: 30,
+            padding: '34px 26px',
+            boxShadow: '0 20px 54px rgba(31, 49, 88, 0.16)',
             color: '#ffffff',
             marginBottom: 28,
+            textAlign: 'center',
           }}
         >
           <div
             style={{
               display: 'flex',
               flexDirection: 'column',
+              alignItems: 'center',
               gap: 18,
-              alignItems: 'flex-start',
             }}
           >
+            <img
+              src="/logo-a4p.png"
+              alt="Académie de Performances"
+              style={{
+                width: '100%',
+                maxWidth: 440,
+                height: 'auto',
+                display: 'block',
+                objectFit: 'contain',
+                filter: 'drop-shadow(0 8px 24px rgba(0,0,0,0.18))',
+              }}
+            />
+
             <div
               style={{
                 fontSize: 14,
                 fontWeight: 800,
-                letterSpacing: 1.2,
+                letterSpacing: 1.4,
                 textTransform: 'uppercase',
                 opacity: 0.82,
               }}
@@ -62,13 +76,11 @@ export default function HomePage() {
                 margin: 0,
                 maxWidth: 720,
                 fontSize: 'clamp(18px, 2.7vw, 22px)',
-                lineHeight: 1.55,
+                lineHeight: 1.5,
                 color: 'rgba(255,255,255,0.92)',
               }}
             >
-              Une entrée simple pour vos clients : un parcours individuel pour
-              les sportifs et un parcours club pour les coachs, dirigeants et
-              staffs.
+              Deux accès simples : individuel ou club.
             </p>
           </div>
         </section>
@@ -91,8 +103,8 @@ export default function HomePage() {
               style={{
                 background: '#ffffff',
                 borderRadius: 24,
-                padding: 28,
-                minHeight: 330,
+                padding: 30,
+                minHeight: 300,
                 boxShadow: '0 14px 36px rgba(31, 49, 88, 0.10)',
                 border: '1px solid #dbe4f2',
                 display: 'flex',
@@ -104,23 +116,17 @@ export default function HomePage() {
               <div>
                 <div
                   style={{
-                    width: 62,
-                    height: 62,
-                    borderRadius: 18,
+                    width: 54,
+                    height: 54,
+                    borderRadius: 16,
                     background: '#eef3fb',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 28,
                     marginBottom: 22,
                   }}
-                >
-                  🧍
-                </div>
+                />
 
                 <h2
                   style={{
-                    margin: '0 0 12px 0',
+                    margin: '0 0 14px 0',
                     fontSize: 34,
                     lineHeight: 1.05,
                     fontWeight: 900,
@@ -138,14 +144,13 @@ export default function HomePage() {
                     color: '#5d6d89',
                   }}
                 >
-                  Pour le sportif, le parent ou l’utilisateur individuel.
-                  Accédez au parcours personnel, aux tests et aux résultats.
+                  Accédez à vos tests, vos résultats et à votre suivi personnel.
                 </p>
 
                 <ul
                   style={{
                     margin: 0,
-                    paddingLeft: 22,
+                    paddingLeft: 20,
                     color: '#62728d',
                     fontSize: 15,
                     lineHeight: 1.9,
@@ -153,7 +158,7 @@ export default function HomePage() {
                 >
                   <li>Passer les tests</li>
                   <li>Consulter ses résultats</li>
-                  <li>Retrouver son historique</li>
+                  <li>Suivre sa progression</li>
                 </ul>
               </div>
 
@@ -190,8 +195,8 @@ export default function HomePage() {
               style={{
                 background: '#ffffff',
                 borderRadius: 24,
-                padding: 28,
-                minHeight: 330,
+                padding: 30,
+                minHeight: 300,
                 boxShadow: '0 14px 36px rgba(31, 49, 88, 0.10)',
                 border: '1px solid #dbe4f2',
                 display: 'flex',
@@ -203,23 +208,17 @@ export default function HomePage() {
               <div>
                 <div
                   style={{
-                    width: 62,
-                    height: 62,
-                    borderRadius: 18,
+                    width: 54,
+                    height: 54,
+                    borderRadius: 16,
                     background: '#eef3fb',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 28,
                     marginBottom: 22,
                   }}
-                >
-                  🏉
-                </div>
+                />
 
                 <h2
                   style={{
-                    margin: '0 0 12px 0',
+                    margin: '0 0 14px 0',
                     fontSize: 34,
                     lineHeight: 1.05,
                     fontWeight: 900,
@@ -237,14 +236,14 @@ export default function HomePage() {
                     color: '#5d6d89',
                   }}
                 >
-                  Pour les dirigeants, coachs et staffs. Consultez les joueurs,
-                  les équipes, les synthèses et les dashboards du club.
+                  Pilotez vos équipes, analysez les profils et prenez des
+                  décisions concrètes.
                 </p>
 
                 <ul
                   style={{
                     margin: 0,
-                    paddingLeft: 22,
+                    paddingLeft: 20,
                     color: '#62728d',
                     fontSize: 15,
                     lineHeight: 1.9,
@@ -278,19 +277,6 @@ export default function HomePage() {
             </article>
           </Link>
         </section>
-
-        <div
-          style={{
-            marginTop: 26,
-            textAlign: 'center',
-            color: '#61718d',
-            fontSize: 16,
-            lineHeight: 1.7,
-          }}
-        >
-          Une plateforme simple pour comprendre et piloter le mental des
-          joueurs et des équipes.
-        </div>
       </div>
     </main>
   )
