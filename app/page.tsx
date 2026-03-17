@@ -6,46 +6,43 @@ export default function HomePage() {
       style={{
         minHeight: '100vh',
         background: 'linear-gradient(180deg, #eef2f8 0%, #e9eef7 100%)',
-        padding: '28px 20px 48px',
+        padding: '24px 18px 48px',
         color: '#1f3158',
       }}
     >
-      <div style={{ maxWidth: 920, margin: '0 auto' }}>
-        
+      <div style={{ maxWidth: 860, margin: '0 auto' }}>
+
         {/* HEADER */}
         <section
           style={{
             background: 'linear-gradient(135deg, #223a6b 0%, #2d4d8e 100%)',
-            borderRadius: 26,
-            padding: '28px 20px',
-            boxShadow: '0 18px 48px rgba(31,49,88,0.16)',
+            borderRadius: 24,
+            padding: '22px 18px 26px',
+            boxShadow: '0 18px 48px rgba(31,49,88,0.14)',
             color: '#ffffff',
-            marginBottom: 24,
+            marginBottom: 22,
             textAlign: 'center',
           }}
         >
-          {/* LOGO CLEAN */}
+          {/* LOGO LIGHT */}
           <img
             src="/logo-a4p.png"
             alt="A4P"
             style={{
-              width: '100%',
-              maxWidth: 260,
-              margin: '0 auto 18px',
+              width: 180,
+              margin: '0 auto 12px',
               display: 'block',
-              objectFit: 'contain',
               opacity: 0.95,
             }}
           />
 
           <div
             style={{
-              fontSize: 13,
-              fontWeight: 700,
+              fontSize: 12,
               letterSpacing: 1.2,
               textTransform: 'uppercase',
-              opacity: 0.75,
-              marginBottom: 8,
+              opacity: 0.7,
+              marginBottom: 6,
             }}
           >
             Plateforme A4P
@@ -54,9 +51,9 @@ export default function HomePage() {
           <h1
             style={{
               margin: 0,
-              fontSize: 'clamp(28px, 6vw, 42px)',
-              lineHeight: 1.1,
+              fontSize: 32,
               fontWeight: 900,
+              lineHeight: 1.2,
             }}
           >
             Choisissez votre accès
@@ -64,66 +61,38 @@ export default function HomePage() {
 
           <p
             style={{
-              marginTop: 10,
-              fontSize: 18,
-              lineHeight: 1.5,
-              opacity: 0.9,
+              marginTop: 8,
+              fontSize: 16,
+              opacity: 0.85,
             }}
           >
-            Individuel ou club.
+            Individuel ou club
           </p>
         </section>
 
         {/* CARTES */}
-        <section
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr',
-            gap: 20,
-          }}
-        >
+        <section style={{ display: 'grid', gap: 18 }}>
+
           {/* INDIVIDUEL */}
           <Link href="/individuel" style={{ textDecoration: 'none' }}>
             <div
               style={{
                 background: '#ffffff',
-                borderRadius: 22,
-                padding: 26,
-                boxShadow: '0 12px 32px rgba(31,49,88,0.08)',
+                borderRadius: 20,
+                padding: 24,
+                boxShadow: '0 10px 28px rgba(31,49,88,0.08)',
                 border: '1px solid #e3eaf5',
               }}
             >
-              <h2
-                style={{
-                  margin: '0 0 10px',
-                  fontSize: 28,
-                  fontWeight: 900,
-                  color: '#1f3158',
-                }}
-              >
+              <h2 style={{ fontSize: 26, fontWeight: 900, marginBottom: 8 }}>
                 Accès individuel
               </h2>
 
-              <p
-                style={{
-                  margin: '0 0 14px',
-                  fontSize: 16,
-                  color: '#5d6d89',
-                  lineHeight: 1.6,
-                }}
-              >
-                Accédez à vos tests, résultats et progression personnelle.
+              <p style={{ color: '#5d6d89', marginBottom: 12 }}>
+                Tests, résultats et progression personnelle.
               </p>
 
-              <ul
-                style={{
-                  margin: 0,
-                  paddingLeft: 18,
-                  fontSize: 14,
-                  color: '#6b7a95',
-                  lineHeight: 1.8,
-                }}
-              >
+              <ul style={{ paddingLeft: 18, color: '#6b7a95' }}>
                 <li>Passer les tests</li>
                 <li>Consulter ses résultats</li>
                 <li>Suivre sa progression</li>
@@ -131,12 +100,12 @@ export default function HomePage() {
 
               <div
                 style={{
-                  marginTop: 20,
-                  display: 'inline-block',
+                  marginTop: 16,
                   background: '#1f3158',
                   color: '#fff',
-                  padding: '12px 20px',
-                  borderRadius: 12,
+                  padding: '10px 16px',
+                  borderRadius: 10,
+                  display: 'inline-block',
                   fontWeight: 700,
                 }}
               >
@@ -150,43 +119,21 @@ export default function HomePage() {
             <div
               style={{
                 background: '#ffffff',
-                borderRadius: 22,
-                padding: 26,
-                boxShadow: '0 12px 32px rgba(31,49,88,0.08)',
+                borderRadius: 20,
+                padding: 24,
+                boxShadow: '0 10px 28px rgba(31,49,88,0.08)',
                 border: '1px solid #e3eaf5',
               }}
             >
-              <h2
-                style={{
-                  margin: '0 0 10px',
-                  fontSize: 28,
-                  fontWeight: 900,
-                  color: '#1f3158',
-                }}
-              >
+              <h2 style={{ fontSize: 26, fontWeight: 900, marginBottom: 8 }}>
                 Accès club
               </h2>
 
-              <p
-                style={{
-                  margin: '0 0 14px',
-                  fontSize: 16,
-                  color: '#5d6d89',
-                  lineHeight: 1.6,
-                }}
-              >
-                Analysez vos équipes et pilotez la performance mentale.
+              <p style={{ color: '#5d6d89', marginBottom: 12 }}>
+                Analyse et pilotage des équipes.
               </p>
 
-              <ul
-                style={{
-                  margin: 0,
-                  paddingLeft: 18,
-                  fontSize: 14,
-                  color: '#6b7a95',
-                  lineHeight: 1.8,
-                }}
-              >
+              <ul style={{ paddingLeft: 18, color: '#6b7a95' }}>
                 <li>Voir les équipes</li>
                 <li>Analyser les profils</li>
                 <li>Piloter le collectif</li>
@@ -194,12 +141,12 @@ export default function HomePage() {
 
               <div
                 style={{
-                  marginTop: 20,
-                  display: 'inline-block',
+                  marginTop: 16,
                   background: '#1f3158',
                   color: '#fff',
-                  padding: '12px 20px',
-                  borderRadius: 12,
+                  padding: '10px 16px',
+                  borderRadius: 10,
+                  display: 'inline-block',
                   fontWeight: 700,
                 }}
               >
@@ -207,6 +154,7 @@ export default function HomePage() {
               </div>
             </div>
           </Link>
+
         </section>
       </div>
     </main>
