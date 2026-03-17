@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
 type Player = {
@@ -11,14 +11,12 @@ type Player = {
   lastname?: string | null
   email?: string | null
   team_id?: string | null
-  created_at?: string | null
 }
 
 type Team = {
   id: string
   name?: string | null
   team_name?: string | null
-  season?: string | null
   club_id?: string | null
 }
 
@@ -31,7 +29,6 @@ type Club = {
 type Result = {
   id?: string | null
   player_id?: string | null
-  token?: string | null
   profile_code?: string | null
   profile_label?: string | null
   score_global?: number | string | null
@@ -50,6 +47,12 @@ type Result = {
   [key: string]: unknown
 }
 
+type TeamPlayerLite = {
+  id: string
+  firstname?: string | null
+  lastname?: string | null
+}
+
 type Radar = {
   confiance: number
   regulation: number
@@ -65,6 +68,7 @@ type PageState = {
   club: Club | null
   result: Result | null
   teamResults: Result[]
+  teamPlayers: TeamPlayerLite[]
 }
 
 function normalize(value: unknown): number | null {
@@ -91,12 +95,10 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 function getFromSource(source: Record<string, unknown> | null | undefined, keys: string[]) {
   if (!source) return null
-
   for (const key of keys) {
     const value = normalize(source[key])
     if (value !== null) return value
   }
-
   return null
 }
 
@@ -121,7 +123,7 @@ function extractRadar(result: Result | null): Radar | null {
 
   const payload = asRecord(result.payload)
   const rawPayload = asRecord(result.raw_payload)
-  const resultObj = asRecord(result.result)
+  const nestedResult = asRecord(result.result)
 
   const sources: Array<Record<string, unknown> | null> = [
     asRecord(result.dimensions),
@@ -132,9 +134,9 @@ function extractRadar(result: Result | null): Radar | null {
     rawPayload,
     asRecord(rawPayload?.dimensions),
     asRecord(rawPayload?.scores),
-    resultObj,
-    asRecord(resultObj?.dimensions),
-    asRecord(resultObj?.scores)
+    nestedResult,
+    asRecord(nestedResult?.dimensions),
+    asRecord(nestedResult?.scores)
   ]
 
   for (const source of sources) {
@@ -158,7 +160,7 @@ function extractRadar(result: Result | null): Radar | null {
   return null
 }
 
-function getPlayerName(player: Player | null) {
+function getPlayerName(player: { firstname?: string | null; lastname?: string | null } | null) {
   if (!player) return 'Joueur'
   const fullName = [player.firstname || '', player.lastname || ''].filter(Boolean).join(' ').trim()
   return fullName || 'Sportif sans nom'
@@ -178,7 +180,6 @@ function formatDate(value?: string | null) {
   if (!value) return '—'
   const d = new Date(value)
   if (Number.isNaN(d.getTime())) return '—'
-
   return new Intl.DateTimeFormat('fr-FR', {
     dateStyle: 'short',
     timeStyle: 'short'
@@ -191,6 +192,14 @@ function getLevel(score: number | null) {
   if (score < 65) return 'Zone de progression'
   if (score < 80) return 'Zone solide'
   return 'Zone forte'
+}
+
+function getReadinessLabel(score: number | null) {
+  if (score === null) return 'Indisponible'
+  if (score < 45) return 'Vigilance'
+  if (score < 65) return 'À stabiliser'
+  if (score < 80) return 'Compétitif'
+  return 'Très prêt'
 }
 
 function getCoachInsight(score: number | null, radar: Radar | null) {
@@ -208,22 +217,10 @@ function getCoachInsight(score: number | null, radar: Radar | null) {
     return `Le levier actuellement le plus fort est la ${strongest}. Le point de vigilance principal concerne la ${weakest}. L’accompagnement doit s’appuyer sur le point fort pour renforcer la stabilité du joueur dans les moments à enjeu.`
   }
 
-  if (score === null) {
-    return 'Aucune lecture détaillée disponible pour le moment.'
-  }
-
-  if (score < 45) {
-    return "Le joueur a besoin d'un cadre mental simple, sécurisant et répétitif pour installer des repères stables."
-  }
-
-  if (score < 65) {
-    return "Le joueur présente une base utile mais encore irrégulière. L'enjeu principal est de transformer le potentiel en constance."
-  }
-
-  if (score < 80) {
-    return 'Le joueur montre une base mentale solide. Le travail du coach peut viser la précision et la répétabilité.'
-  }
-
+  if (score === null) return 'Aucune lecture détaillée disponible pour le moment.'
+  if (score < 45) return "Le joueur a besoin d'un cadre mental simple, sécurisant et répétitif pour installer des repères stables."
+  if (score < 65) return "Le joueur présente une base utile mais encore irrégulière. L'enjeu principal est de transformer le potentiel en constance."
+  if (score < 80) return 'Le joueur montre une base mentale solide. Le travail du coach peut viser la précision et la répétabilité.'
   return 'Le joueur présente une structure mentale forte. Le travail peut porter sur l’optimisation sous haute pression.'
 }
 
@@ -249,7 +246,7 @@ function getProgressAxes(radar: Radar | null, score: number | null) {
       return [
         'Stabiliser le fonctionnement mental dans les temps faibles.',
         'Identifier les déclencheurs qui perturbent la performance.',
-        'Renforcer la continuité entre intention, engagement et action.'
+        "Renforcer la continuité entre intention, engagement et action."
       ]
     }
 
@@ -261,26 +258,10 @@ function getProgressAxes(radar: Radar | null, score: number | null) {
   }
 
   return [
-    {
-      key: 'confiance',
-      value: radar.confiance,
-      text: 'Renforcer la confiance par des repères de réussite concrets.'
-    },
-    {
-      key: 'regulation',
-      value: radar.regulation,
-      text: 'Améliorer la régulation émotionnelle avec routines respiratoires et recentrage.'
-    },
-    {
-      key: 'engagement',
-      value: radar.engagement,
-      text: "Clarifier l'intention d'action et maintenir l'engagement jusqu'au bout."
-    },
-    {
-      key: 'stabilite',
-      value: radar.stabilite,
-      text: 'Développer la stabilité mentale dans la durée et sous pression.'
-    }
+    { key: 'confiance', value: radar.confiance, text: 'Renforcer la confiance par des repères de réussite concrets.' },
+    { key: 'regulation', value: radar.regulation, text: 'Améliorer la régulation émotionnelle avec routines respiratoires et recentrage.' },
+    { key: 'engagement', value: radar.engagement, text: "Clarifier l'intention d'action et maintenir l'engagement jusqu'au bout." },
+    { key: 'stabilite', value: radar.stabilite, text: 'Développer la stabilité mentale dans la durée et sous pression.' }
   ]
     .sort((a, b) => a.value - b.value)
     .slice(0, 3)
@@ -297,6 +278,29 @@ function getPercentileText(playerScore: number | null, teamScores: number[]) {
   if (percentile >= 60) return 'Au-dessus de la moyenne équipe'
   if (percentile >= 40) return 'Dans la moyenne équipe'
   return 'En dessous de la moyenne équipe'
+}
+
+function buildTeamRanking(teamPlayers: TeamPlayerLite[], teamResults: Result[], currentPlayerId: string) {
+  const latestByPlayer = new Map<string, Result>()
+
+  for (const item of teamResults) {
+    const pid = typeof item.player_id === 'string' ? item.player_id : null
+    if (!pid) continue
+    if (!latestByPlayer.has(pid)) latestByPlayer.set(pid, item)
+  }
+
+  return teamPlayers
+    .map((player) => {
+      const result = latestByPlayer.get(player.id)
+      return {
+        playerId: player.id,
+        name: getPlayerName(player),
+        score: normalize(result?.score_global),
+        isCurrentPlayer: player.id === currentPlayerId
+      }
+    })
+    .filter((row) => row.score !== null)
+    .sort((a, b) => (b.score ?? -1) - (a.score ?? -1))
 }
 
 function RadarChart({ radar }: { radar: Radar | null }) {
@@ -328,10 +332,7 @@ function RadarChart({ radar }: { radar: Radar | null }) {
   const point = (value: number, angleDeg: number) => {
     const angle = (angleDeg * Math.PI) / 180
     const radius = (value / 100) * maxRadius
-    return {
-      x: cx + Math.cos(angle) * radius,
-      y: cy + Math.sin(angle) * radius
-    }
+    return { x: cx + Math.cos(angle) * radius, y: cy + Math.sin(angle) * radius }
   }
 
   const polygonPoints = values
@@ -351,15 +352,7 @@ function RadarChart({ radar }: { radar: Radar | null }) {
               return `${p.x},${p.y}`
             })
             .join(' ')
-          return (
-            <polygon
-              key={level}
-              points={pts}
-              fill="none"
-              stroke="#d8e1ef"
-              strokeWidth="1"
-            />
-          )
+          return <polygon key={level} points={pts} fill="none" stroke="#d8e1ef" strokeWidth="1" />
         })}
 
         {angles.map((angle, index) => {
@@ -381,12 +374,7 @@ function RadarChart({ radar }: { radar: Radar | null }) {
           )
         })}
 
-        <polygon
-          points={polygonPoints}
-          fill="rgba(65,104,176,0.22)"
-          stroke="#2f4d85"
-          strokeWidth="3"
-        />
+        <polygon points={polygonPoints} fill="rgba(65,104,176,0.22)" stroke="#2f4d85" strokeWidth="3" />
 
         {values.map((value, index) => {
           const p = point(value, angles[index])
@@ -399,8 +387,6 @@ function RadarChart({ radar }: { radar: Radar | null }) {
       <div style={{ color: '#5f6f8e', fontWeight: 800 }}>Radar mental A4P</div>
     </div>
   )
-}
-
 function StatCard({
   value,
   label,
@@ -467,6 +453,33 @@ function InfoBox({
   )
 }
 
+function Badge({
+  text,
+  background,
+  color
+}: {
+  text: string
+  background: string
+  color: string
+}) {
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        padding: '10px 14px',
+        borderRadius: 999,
+        background,
+        color,
+        fontWeight: 900,
+        fontSize: 14
+      }}
+    >
+      {text}
+    </span>
+  )
+}
+
 export default function PlayerPage() {
   const params = useParams()
   const playerId = typeof params?.playerId === 'string' ? params.playerId : ''
@@ -478,7 +491,8 @@ export default function PlayerPage() {
     team: null,
     club: null,
     result: null,
-    teamResults: []
+    teamResults: [],
+    teamPlayers: []
   })
 
   useEffect(() => {
@@ -488,9 +502,7 @@ export default function PlayerPage() {
       try {
         setState((prev) => ({ ...prev, loading: true, error: '' }))
 
-        if (!playerId) {
-          throw new Error('Identifiant joueur manquant.')
-        }
+        if (!playerId) throw new Error('Identifiant joueur manquant.')
 
         const { data: playerData, error: playerError } = await supabase
           .from('players')
@@ -508,6 +520,7 @@ export default function PlayerPage() {
         let team: Team | null = null
         let club: Club | null = null
         let teamResults: Result[] = []
+        let teamPlayers: TeamPlayerLite[] = []
 
         if (player.team_id) {
           const { data: teamData, error: teamError } = await supabase
@@ -532,12 +545,13 @@ export default function PlayerPage() {
 
           const { data: teamPlayersData, error: teamPlayersError } = await supabase
             .from('players')
-            .select('id')
+            .select('id, firstname, lastname')
             .eq('team_id', player.team_id)
 
           if (teamPlayersError) throw teamPlayersError
+          teamPlayers = (teamPlayersData as TeamPlayerLite[] | null) ?? []
 
-          const teamPlayerIds = ((teamPlayersData as Array<{ id: string }> | null) ?? []).map((p) => p.id)
+          const teamPlayerIds = teamPlayers.map((p) => p.id)
 
           if (teamPlayerIds.length > 0) {
             const { data: allTeamResultsData, error: allTeamResultsError } = await supabase
@@ -549,22 +563,17 @@ export default function PlayerPage() {
             if (allTeamResultsError) throw allTeamResultsError
 
             const allTeamResults = (allTeamResultsData as Result[] | null) ?? []
-
             const latestByPlayer = new Map<string, Result>()
 
             for (const item of allTeamResults) {
               const pid = typeof item.player_id === 'string' ? item.player_id : null
               if (!pid) continue
-              if (!latestByPlayer.has(pid)) {
-                latestByPlayer.set(pid, item)
-              }
+              if (!latestByPlayer.has(pid)) latestByPlayer.set(pid, item)
             }
 
             teamResults = Array.from(latestByPlayer.values())
           }
         }
-
-        let result: Result | null = null
 
         const { data: resultData, error: resultError } = await supabase
           .from('cmp_results')
@@ -574,8 +583,7 @@ export default function PlayerPage() {
           .limit(1)
 
         if (resultError) throw resultError
-
-        result = ((resultData as Result[] | null) ?? [])[0] ?? null
+        const result = ((resultData as Result[] | null) ?? [])[0] ?? null
 
         if (!cancelled) {
           setState({
@@ -585,7 +593,8 @@ export default function PlayerPage() {
             team,
             club,
             result,
-            teamResults
+            teamResults,
+            teamPlayers
           })
         }
       } catch (error: unknown) {
@@ -599,7 +608,8 @@ export default function PlayerPage() {
             team: null,
             club: null,
             result: null,
-            teamResults: []
+            teamResults: [],
+            teamPlayers: []
           })
         }
       }
@@ -632,6 +642,13 @@ export default function PlayerPage() {
   const percentileText = getPercentileText(globalScore, teamScores)
   const coachInsight = getCoachInsight(globalScore, radar)
   const progressAxes = getProgressAxes(radar, globalScore)
+  const ranking = useMemo(
+    () => buildTeamRanking(state.teamPlayers, state.teamResults, playerId),
+    [state.teamPlayers, state.teamResults, playerId]
+  )
+
+  const playerRank = ranking.findIndex((row) => row.playerId === playerId) + 1
+  const readinessLabel = getReadinessLabel(globalScore)
 
   if (state.loading) {
     return <div style={{ padding: 20 }}>Chargement...</div>
@@ -713,73 +730,38 @@ export default function PlayerPage() {
                 maxWidth: 980
               }}
             >
-              Lecture mentale individuelle, repérage des leviers prioritaires et positionnement par
-              rapport à l’équipe.
+              Lecture mentale individuelle, repérage des leviers prioritaires, préparation du staff
+              et positionnement par rapport à l’équipe.
             </p>
 
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 18 }}>
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  padding: '10px 14px',
-                  borderRadius: 999,
-                  background: '#eef2ff',
-                  color: '#34518b',
-                  fontWeight: 800
-                }}
-              >
-                Club : {getClubName(state.club)}
-              </span>
-
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  padding: '10px 14px',
-                  borderRadius: 999,
-                  background: '#eef2ff',
-                  color: '#34518b',
-                  fontWeight: 800
-                }}
-              >
-                Équipe : {getTeamName(state.team)}
-              </span>
-
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  padding: '10px 14px',
-                  borderRadius: 999,
-                  background: '#eef2ff',
-                  color: '#34518b',
-                  fontWeight: 800
-                }}
-              >
-                Email : {state.player.email || '—'}
-              </span>
+              <Badge text={`Club : ${getClubName(state.club)}`} background="#eef2ff" color="#34518b" />
+              <Badge text={`Équipe : ${getTeamName(state.team)}`} background="#eef2ff" color="#34518b" />
+              <Badge text={`Email : ${state.player.email || '—'}`} background="#eef2ff" color="#34518b" />
             </div>
           </div>
 
-          <Link
-            href="/club"
-            style={{
-              textDecoration: 'none',
-              padding: '14px 20px',
-              borderRadius: 16,
-              color: '#ffffff',
-              background: 'linear-gradient(135deg, #2f4d85 0%, #4168b0 100%)',
-              fontWeight: 800,
-              fontSize: 16,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 12px 26px rgba(47,77,133,0.22)'
-            }}
-          >
-            Retour club
-          </Link>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <Badge text={`État : ${readinessLabel}`} background="#ecfdf3" color="#067647" />
+            <Link
+              href="/club"
+              style={{
+                textDecoration: 'none',
+                padding: '14px 20px',
+                borderRadius: 16,
+                color: '#ffffff',
+                background: 'linear-gradient(135deg, #2f4d85 0%, #4168b0 100%)',
+                fontWeight: 800,
+                fontSize: 16,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 12px 26px rgba(47,77,133,0.22)'
+              }}
+            >
+              Retour club
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -791,26 +773,24 @@ export default function PlayerPage() {
           marginBottom: 24
         }}
       >
-        <StatCard
-          value={globalScore !== null ? `${globalScore}/100` : '—'}
-          label="score global"
-          helper={getLevel(globalScore)}
-        />
-        <StatCard
-          value={state.result?.profile_label || state.result?.profile_code || '—'}
-          label="profil mental"
-          helper="lecture actuelle"
-        />
-        <StatCard
-          value={teamAverage !== null ? `${teamAverage}/100` : '—'}
-          label="moyenne équipe"
-          helper="référence collective"
-        />
-        <StatCard
-          value={gapVsTeam !== null ? `${gapVsTeam > 0 ? '+' : ''}${gapVsTeam}` : '—'}
-          label="écart équipe"
-          helper={percentileText}
-        />
+        <StatCard value={globalScore !== null ? `${globalScore}/100` : '—'} label="score global" helper={getLevel(globalScore)} />
+        <StatCard value={state.result?.profile_label || state.result?.profile_code || '—'} label="profil mental" helper="lecture actuelle" />
+        <StatCard value={teamAverage !== null ? `${teamAverage}/100` : '—'} label="moyenne équipe" helper="référence collective" />
+        <StatCard value={gapVsTeam !== null ? `${gapVsTeam > 0 ? '+' : ''}${gapVsTeam}` : '—'} label="écart équipe" helper={percentileText} />
+      </section>
+
+      <section
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: 18,
+          marginBottom: 24
+        }}
+      >
+        <StatCard value={playerRank > 0 ? `#${playerRank}` : '—'} label="rang équipe" helper="classement score global" />
+        <StatCard value={ranking.length} label="joueurs classés" helper="base disponible" />
+        <StatCard value={formatDate(state.result?.created_at)} label="dernière mesure" helper="date résultat" />
+        <StatCard value={readinessLabel} label="niveau de préparation" helper="lecture staff" />
       </section>
 
       <section
@@ -822,47 +802,43 @@ export default function PlayerPage() {
         }}
       >
         <InfoBox title="Analyse coach">
-          <p style={{ margin: 0, fontSize: 18, lineHeight: 1.8, color: '#5f6f8e' }}>
-            {coachInsight}
-          </p>
+          <>
+            <p style={{ margin: 0, fontSize: 18, lineHeight: 1.8, color: '#5f6f8e' }}>
+              {coachInsight}
+            </p>
 
-          <div
-            style={{
-              marginTop: 18,
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-              gap: 12
-            }}
-          >
-            <StatCard
-              value={formatDate(state.result?.created_at)}
-              label="dernière mesure"
-              helper="date résultat"
-            />
-            <StatCard
-              value={state.teamResults.length}
-              label="joueurs comparés"
-              helper="base équipe"
-            />
-          </div>
+            <div
+              style={{
+                marginTop: 18,
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gap: 12
+              }}
+            >
+              <StatCard value={percentileText} label="positionnement équipe" helper="lecture comparative" />
+              <StatCard value={state.teamResults.length} label="résultats équipe" helper="base collective" />
+            </div>
+          </>
         </InfoBox>
 
         <InfoBox title="Radar mental">
-          <RadarChart radar={radar} />
+          <>
+            <RadarChart radar={radar} />
 
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-              gap: 12,
-              marginTop: 18
-            }}
-          >
-            <StatCard value={radar ? `${radar.confiance}/100` : '—'} label="confiance" />
-            <StatCard value={radar ? `${radar.regulation}/100` : '—'} label="régulation" />
-            <StatCard value={radar ? `${radar.engagement}/100` : '—'} label="engagement" />
-            <StatCard value={radar ? `${radar.stabilite}/100` : '—'} label="stabilité" />
-          </div>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gap: 12,
+                marginTop: 18
+              }}
+            >
+              <StatCard value={radar ? `${radar.confiance}/100` : '—'} label="confiance" />
+              <StatCard value={radar ? `${radar.regulation}/100` : '—'} label="régulation" />
+              <StatCard value={radar ? `${radar.engagement}/100` : '—'} label="engagement" />
+              <StatCard value={radar ? `${radar.stabilite}/100` : '—'} label="stabilité" />
+            </div>
+          </>
         </InfoBox>
       </section>
 
@@ -870,109 +846,171 @@ export default function PlayerPage() {
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))',
-          gap: 24
+          gap: 24,
+          marginBottom: 24
         }}
       >
         <InfoBox title="Axes de progression prioritaires">
-          <div style={{ display: 'grid', gap: 14 }}>
-            {progressAxes.map((item, index) => (
+          <>
+            <div style={{ display: 'grid', gap: 14 }}>
+              {progressAxes.map((item, index) => (
+                <div
+                  key={`${item}-${index}`}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '52px 1fr',
+                    gap: 16,
+                    alignItems: 'start',
+                    padding: 18,
+                    borderRadius: 20,
+                    background: '#f8fafd',
+                    border: '1px solid #e1e8f3'
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 52,
+                      height: 52,
+                      borderRadius: 999,
+                      background: '#eef2ff',
+                      color: '#34518b',
+                      fontWeight: 900,
+                      fontSize: 22,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    {index + 1}
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: 17,
+                      lineHeight: 1.75,
+                      color: '#44516d',
+                      fontWeight: 700
+                    }}
+                  >
+                    {item}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        </InfoBox>
+
+        <InfoBox title="Synthèse staff">
+          <>
+            <div style={{ display: 'grid', gap: 14 }}>
               <div
-                key={`${item}-${index}`}
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: '52px 1fr',
-                  gap: 16,
-                  alignItems: 'start',
                   padding: 18,
                   borderRadius: 20,
                   background: '#f8fafd',
-                  border: '1px solid #e1e8f3'
+                  border: '1px solid #e1e8f3',
+                  color: '#44516d',
+                  lineHeight: 1.8,
+                  fontWeight: 700
+                }}
+              >
+                Niveau actuel : {getLevel(globalScore)}.
+              </div>
+
+              <div
+                style={{
+                  padding: 18,
+                  borderRadius: 20,
+                  background: '#f8fafd',
+                  border: '1px solid #e1e8f3',
+                  color: '#44516d',
+                  lineHeight: 1.8,
+                  fontWeight: 700
+                }}
+              >
+                Positionnement équipe : {percentileText}.
+              </div>
+
+              <div
+                style={{
+                  padding: 18,
+                  borderRadius: 20,
+                  background: '#f8fafd',
+                  border: '1px solid #e1e8f3',
+                  color: '#44516d',
+                  lineHeight: 1.8,
+                  fontWeight: 700
+                }}
+              >
+                Priorité coach : transformer les axes faibles en routines observables à l’entraînement et en compétition.
+              </div>
+            </div>
+          </>
+        </InfoBox>
+      </section>
+
+      <InfoBox title="Classement équipe">
+        {ranking.length === 0 ? (
+          <div style={{ color: '#667085', lineHeight: 1.7 }}>
+            Classement indisponible : pas assez de résultats équipe.
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: 12 }}>
+            {ranking.slice(0, 10).map((row, index) => (
+              <div
+                key={row.playerId}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '64px 1fr 120px',
+                  gap: 16,
+                  alignItems: 'center',
+                  padding: 16,
+                  borderRadius: 18,
+                  border: row.isCurrentPlayer ? '2px solid #9cb5e8' : '1px solid #e1e8f3',
+                  background: row.isCurrentPlayer ? '#eef4ff' : '#f8fafd'
                 }}
               >
                 <div
                   style={{
-                    width: 52,
-                    height: 52,
+                    width: 48,
+                    height: 48,
                     borderRadius: 999,
-                    background: '#eef2ff',
-                    color: '#34518b',
-                    fontWeight: 900,
-                    fontSize: 22,
+                    background: '#ffffff',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center'
+                    justifyContent: 'center',
+                    fontWeight: 900,
+                    color: '#20335d',
+                    boxShadow: '0 6px 18px rgba(23,37,69,0.08)'
                   }}
                 >
-                  {index + 1}
+                  #{index + 1}
+                </div>
+
+                <div>
+                  <div style={{ fontWeight: 900, color: '#20335d', fontSize: 17 }}>
+                    {row.name}
+                  </div>
+                  <div style={{ color: '#667085', fontSize: 14 }}>
+                    {row.isCurrentPlayer ? 'Joueur affiché' : 'Autre joueur équipe'}
+                  </div>
                 </div>
 
                 <div
                   style={{
-                    fontSize: 17,
-                    lineHeight: 1.75,
-                    color: '#44516d',
-                    fontWeight: 700
+                    justifySelf: 'end',
+                    fontWeight: 900,
+                    fontSize: 20,
+                    color: '#20335d'
                   }}
                 >
-                  {item}
+                  {row.score !== null ? `${row.score}/100` : '—'}
                 </div>
               </div>
             ))}
           </div>
-        </InfoBox>
-
-        <InfoBox title="Synthèse staff">
-          <div
-            style={{
-              display: 'grid',
-              gap: 14
-            }}
-          >
-            <div
-              style={{
-                padding: 18,
-                borderRadius: 20,
-                background: '#f8fafd',
-                border: '1px solid #e1e8f3',
-                color: '#44516d',
-                lineHeight: 1.8,
-                fontWeight: 700
-              }}
-            >
-              Niveau actuel : {getLevel(globalScore)}.
-            </div>
-
-            <div
-              style={{
-                padding: 18,
-                borderRadius: 20,
-                background: '#f8fafd',
-                border: '1px solid #e1e8f3',
-                color: '#44516d',
-                lineHeight: 1.8,
-                fontWeight: 700
-              }}
-            >
-              Positionnement équipe : {percentileText}.
-            </div>
-
-            <div
-              style={{
-                padding: 18,
-                borderRadius: 20,
-                background: '#f8fafd',
-                border: '1px solid #e1e8f3',
-                color: '#44516d',
-                lineHeight: 1.8,
-                fontWeight: 700
-              }}
-            >
-              Priorité coach : transformer les axes faibles en routines observables à l’entraînement
-              et en compétition.
-            </div>
-          </div>
-        </InfoBox>
-      </section>
+        )}
+      </InfoBox>
     </main>
   )
 }
