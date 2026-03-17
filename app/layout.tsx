@@ -1,17 +1,24 @@
-import '@/styles/globals.css'
-import Navbar from '@/components/Navbar'
-import type { Metadata } from 'next'
-
-export const metadata: Metadata = {
-  title: 'A4P Platform V11',
-  description: 'Portail A4P double entrée, club, individuel, admin et résultats.'
+export const metadata = {
+  title: 'A4P Platform',
+  description: 'Plateforme de performance mentale A4P',
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
     <html lang="fr">
-      <body>
-        <Navbar />
+      <body
+        style={{
+          margin: 0,
+          padding: 0,
+          fontFamily:
+            '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif',
+          backgroundColor: '#eef2f8',
+        }}
+      >
         {children}
       </body>
     </html>
