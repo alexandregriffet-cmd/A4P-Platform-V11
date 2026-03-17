@@ -132,6 +132,28 @@ function StatCard({
   )
 }
 
+function SectionCard({
+  title,
+  children
+}: {
+  title: string
+  children: React.ReactNode
+}) {
+  return (
+    <div
+      style={{
+        background: '#ffffff',
+        borderRadius: 24,
+        padding: 24,
+        boxShadow: '0 10px 30px rgba(20,30,60,0.08)'
+      }}
+    >
+      <h2 style={{ marginTop: 0, marginBottom: 18, fontSize: 34, color: '#182847' }}>{title}</h2>
+      {children}
+    </div>
+  )
+}
+
 function RadarChart({ radar }: { radar: Radar | null }) {
   if (!radar) {
     return (
@@ -223,6 +245,213 @@ function RadarChart({ radar }: { radar: Radar | null }) {
 
       <div style={{ color: '#5f6f8e', fontWeight: 800 }}>Radar mental A4P</div>
     </div>
+  )
+}
+
+function getDominantDimension(radar: Radar | null) {
+  if (!radar) return null
+
+  const items = [
+    { key: 'confiance', value: radar.confiance },
+    { key: 'régulation', value: radar.regulation },
+    { key: 'engagement', value: radar.engagement },
+    { key: 'stabilité', value: radar.stabilite }
+  ].sort((a, b) => b.value - a.value)
+
+  return items[0]?.key ?? null
+}
+
+function getWeakestDimension(radar: Radar | null) {
+  if (!radar) return null
+
+  const items = [
+    { key: 'confiance', value: radar.confiance },
+    { key: 'régulation', value: radar.regulation },
+    { key: 'engagement', value: radar.engagement },
+    { key: 'stabilité', value: radar.stabilite }
+  ].sort((a, b) => a.value - b.value)
+
+  return items[0]?.key ?? null
+}
+
+function getProfileSummary(profile: string | null | undefined) {
+  const value = (profile || '').toLowerCase()
+
+  if (value.includes('explorateur')) {
+    return "Le profil explorateur stratégique renvoie à un fonctionnement orienté vers l’adaptation, l’anticipation et la recherche de solutions. Le joueur a tendance à lire vite les situations, à chercher des options et à mobiliser ses ressources lorsqu’il perçoit du sens dans l’action."
+  }
+
+  if (value.includes('leader')) {
+    return "Le profil de leader traduit souvent une orientation vers l’initiative, l’impact et la prise de responsabilités. Le joueur cherche à peser sur le jeu et à donner une direction claire à son action."
+  }
+
+  if (value.includes('analytique')) {
+    return "Le profil analytique renvoie généralement à un besoin de compréhension, de structure et de maîtrise. Le joueur performe mieux lorsqu’il dispose de repères clairs et d’un cadre cohérent."
+  }
+
+  return "Le profil actuel donne une première lecture utile du fonctionnement mental du joueur. Il sert surtout de repère pour orienter l’accompagnement et prioriser les leviers de progression."
+}
+
+function getScoreSummary(score: number | null) {
+  if (score === null) {
+    return "Aucun score global n’est disponible pour le moment."
+  }
+
+  if (score < 45) {
+    return "Le score global situe actuellement le joueur dans une zone fragile. L’enjeu prioritaire est de recréer de la sécurité mentale, de la répétition et des repères simples."
+  }
+
+  if (score < 65) {
+    return "Le score global montre une base présente mais encore irrégulière. Le joueur dispose de ressources, mais elles ne se stabilisent pas encore suffisamment dans la durée ou sous pression."
+  }
+
+  if (score < 80) {
+    return "Le score global indique une base mentale solide. Le joueur possède déjà des appuis fiables, avec un potentiel clair de progression vers davantage de constance."
+  }
+
+  return "Le score global place le joueur dans une zone forte. La structure mentale semble globalement robuste, avec un potentiel d’optimisation plus que de reconstruction."
+}
+
+function getDimensionSummary(radar: Radar | null) {
+  if (!radar) {
+    return "Les dimensions détaillées ne sont pas encore disponibles, ce qui limite la finesse de lecture du fonctionnement mental."
+  }
+
+  const dominant = getDominantDimension(radar)
+  const weakest = getWeakestDimension(radar)
+
+  return `Le point d’appui principal semble être la ${dominant}. À l’inverse, la ${weakest} apparaît comme le levier le plus vulnérable à court terme. Cela signifie que le travail doit s’appuyer sur le point fort existant tout en sécurisant en priorité la zone la plus instable.`
+}
+
+function getPriorityAxes(radar: Radar | null, score: number | null) {
+  if (!radar) {
+    return [
+      'Installer des routines mentales courtes avant entraînement et compétition.',
+      'Structurer un protocole simple de concentration et de recentrage.',
+      'Créer des repères de confiance observables et répétables.'
+    ]
+  }
+
+  const items = [
+    {
+      key: 'confiance',
+      value: radar.confiance,
+      text: 'Renforcer la confiance avec des repères de réussite concrets et répétés.'
+    },
+    {
+      key: 'regulation',
+      value: radar.regulation,
+      text: 'Développer la régulation émotionnelle pour mieux absorber la pression et les variations de match.'
+    },
+    {
+      key: 'engagement',
+      value: radar.engagement,
+      text: "Clarifier l'intention d'action et maintenir l'engagement jusqu'au bout de la séquence."
+    },
+    {
+      key: 'stabilite',
+      value: radar.stabilite,
+      text: 'Construire davantage de stabilité mentale dans la durée et dans les moments à enjeu.'
+    }
+  ]
+    .sort((a, b) => a.value - b.value)
+    .slice(0, 3)
+    .map((item) => item.text)
+
+  if (score !== null && score >= 80) {
+    return [
+      items[0],
+      'Transformer les points forts actuels en routines de haut niveau.',
+      'Travailler la précision mentale et la répétabilité sous pression.'
+    ]
+  }
+
+  return items
+}
+
+function SyntheseA4P({
+  profile,
+  score,
+  radar
+}: {
+  profile: string | null | undefined
+  score: number | null
+  radar: Radar | null
+}) {
+  const profileSummary = getProfileSummary(profile)
+  const scoreSummary = getScoreSummary(score)
+  const dimensionSummary = getDimensionSummary(radar)
+  const axes = getPriorityAxes(radar, score)
+
+  return (
+    <SectionCard title="Synthèse automatique A4P">
+      <div style={{ display: 'grid', gap: 18 }}>
+        <p style={{ margin: 0, lineHeight: 1.8, color: '#44516d', fontSize: 17 }}>
+          {profileSummary}
+        </p>
+
+        <p style={{ margin: 0, lineHeight: 1.8, color: '#44516d', fontSize: 17 }}>
+          {scoreSummary}
+        </p>
+
+        <p style={{ margin: 0, lineHeight: 1.8, color: '#44516d', fontSize: 17 }}>
+          {dimensionSummary}
+        </p>
+
+        <div
+          style={{
+            padding: 18,
+            borderRadius: 18,
+            background: '#f8fbff',
+            border: '1px solid #dbe5f4'
+          }}
+        >
+          <div
+            style={{
+              fontSize: 15,
+              fontWeight: 900,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: '#60708f',
+              marginBottom: 12
+            }}
+          >
+            Axes de travail prioritaires
+          </div>
+
+          <div style={{ display: 'grid', gap: 12 }}>
+            {axes.map((axis, index) => (
+              <div
+                key={`${axis}-${index}`}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '40px 1fr',
+                  gap: 12,
+                  alignItems: 'start'
+                }}
+              >
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 999,
+                    background: '#e9efff',
+                    color: '#35528f',
+                    fontWeight: 900,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  {index + 1}
+                </div>
+                <div style={{ lineHeight: 1.7, color: '#44516d', fontWeight: 700 }}>{axis}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </SectionCard>
   )
 }
 
@@ -344,7 +573,7 @@ export default function PlayerPage() {
   }
 
   const score = normalizeScore(state.result?.score_global)
-  const radar = extractRadar(state.result)
+  const radar = useMemo(() => extractRadar(state.result), [state.result])
 
   return (
     <main style={{ maxWidth: 1180, margin: '0 auto', padding: 24, background: '#eef2f7' }}>
@@ -401,18 +630,11 @@ export default function PlayerPage() {
             style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))',
-              gap: 24
+              gap: 24,
+              marginBottom: 24
             }}
           >
-            <div
-              style={{
-                background: '#ffffff',
-                borderRadius: 24,
-                padding: 24,
-                boxShadow: '0 10px 30px rgba(20,30,60,0.08)'
-              }}
-            >
-              <h2 style={{ marginTop: 0, fontSize: 34, color: '#182847' }}>Dernier résultat CMP</h2>
+            <SectionCard title="Dernier résultat CMP">
               <p><strong>Score global :</strong> {score !== null ? `${score}/100` : '—'}</p>
               <p><strong>Profil :</strong> {state.result.profile_label || state.result.profile_code || '—'}</p>
               <p><strong>Date :</strong> {formatDate(state.result.created_at)}</p>
@@ -420,20 +642,18 @@ export default function PlayerPage() {
               <p><strong>Régulation :</strong> {radar ? `${radar.regulation}/100` : '—'}</p>
               <p><strong>Engagement :</strong> {radar ? `${radar.engagement}/100` : '—'}</p>
               <p><strong>Stabilité :</strong> {radar ? `${radar.stabilite}/100` : '—'}</p>
-            </div>
+            </SectionCard>
 
-            <div
-              style={{
-                background: '#ffffff',
-                borderRadius: 24,
-                padding: 24,
-                boxShadow: '0 10px 30px rgba(20,30,60,0.08)'
-              }}
-            >
-              <h2 style={{ marginTop: 0, fontSize: 34, color: '#182847' }}>Radar mental</h2>
+            <SectionCard title="Radar mental">
               <RadarChart radar={radar} />
-            </div>
+            </SectionCard>
           </section>
+
+          <SyntheseA4P
+            profile={state.result.profile_label || state.result.profile_code}
+            score={score}
+            radar={radar}
+          />
         </>
       )}
     </main>
