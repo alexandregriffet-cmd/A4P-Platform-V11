@@ -10,28 +10,45 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault()
+  const handleLogin = async () => {
     setLoading(true)
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    })
+
     setLoading(false)
-    if (error) return alert(error.message)
-    router.push('/dashboard')
+
+    if (error) {
+      alert(error.message)
+    } else {
+      router.push('/club')
+    }
   }
 
   return (
-    <main className="page">
-      <div className="card">
-        <h1>Connexion</h1>
-        <form onSubmit={handleLogin} className="form">
-          <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <input type="password" placeholder="Mot de passe" value={password} onChange={(e) => setPassword(e.target.value)} required />
-          <button className="btn" type="submit" disabled={loading}>{loading ? 'Connexion...' : 'Se connecter'}</button>
-        </form>
-        <div className="actions">
-          <a className="btn secondary" href="/signup">Créer un compte</a>
-        </div>
-      </div>
+    <main style={{ padding: 40 }}>
+      <h1>Connexion A4P</h1>
+
+      <input
+        placeholder="Email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        style={{ display: 'block', marginBottom: 10 }}
+      />
+
+      <input
+        type="password"
+        placeholder="Mot de passe"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        style={{ display: 'block', marginBottom: 10 }}
+      />
+
+      <button onClick={handleLogin} disabled={loading}>
+        {loading ? 'Connexion...' : 'Se connecter'}
+      </button>
     </main>
   )
 }
