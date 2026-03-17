@@ -356,7 +356,9 @@ function StatCard({
 
 export default function PlayerPage() {
   const params = useParams()
-  const playerId = typeof params?.playerId === 'string' ? params.playerId : ''
+  const playerId = Array.isArray(params?.playerId)
+  ? params.playerId[0]
+  : params?.playerId || ''
 
   const [state, setState] = useState<PageState>({
     loading: true,
