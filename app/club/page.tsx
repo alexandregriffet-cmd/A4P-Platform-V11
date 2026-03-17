@@ -70,10 +70,6 @@ type CMPResult = ResultBase & {
 
 type PMPResult = ResultBase & {
   profile_label?: string | null
-  decision_style?: string | null
-  focus_mode?: string | null
-  strong_points?: string | null
-  vigilance_points?: string | null
 }
 
 type PsychoResult = {
@@ -81,12 +77,7 @@ type PsychoResult = {
   player_id?: string | null
   club_id?: string | null
   team_id?: string | null
-  profile_label?: string | null
   stress_level?: number | string | null
-  confidence_level?: number | string | null
-  emotional_control?: number | string | null
-  fear_factor?: number | string | null
-  blockages?: string | null
   created_at?: string | null
 }
 
@@ -284,34 +275,9 @@ function RadarBlock({
             stroke="#d5deee"
             strokeWidth="1.2"
           />
-          <polygon
-            points={`${center},${center - radius * 0.75} ${center + radius * 0.75},${center} ${center},${center + radius * 0.75} ${center - radius * 0.75},${center}`}
-            fill="none"
-            stroke="#d5deee"
-            strokeWidth="1"
-          />
-          <polygon
-            points={`${center},${center - radius * 0.5} ${center + radius * 0.5},${center} ${center},${center + radius * 0.5} ${center - radius * 0.5},${center}`}
-            fill="none"
-            stroke="#d5deee"
-            strokeWidth="1"
-          />
-          <polygon
-            points={`${center},${center - radius * 0.25} ${center + radius * 0.25},${center} ${center},${center + radius * 0.25} ${center - radius * 0.25},${center}`}
-            fill="none"
-            stroke="#d5deee"
-            strokeWidth="1"
-          />
-
           <line x1={center} y1={center - radius} x2={center} y2={center + radius} stroke="#d5deee" />
           <line x1={center - radius} y1={center} x2={center + radius} y2={center} stroke="#d5deee" />
-
           <polygon points={points} fill="rgba(53,82,143,0.18)" stroke="#35528f" strokeWidth="4" />
-
-          <circle cx={top.x} cy={top.y} r="4" fill="#35528f" />
-          <circle cx={right.x} cy={right.y} r="4" fill="#35528f" />
-          <circle cx={bottom.x} cy={bottom.y} r="4" fill="#35528f" />
-          <circle cx={left.x} cy={left.y} r="4" fill="#35528f" />
 
           <text x={center} y={20} textAnchor="middle" fontSize="15" fill="#667085" fontWeight="700">
             Confiance
@@ -346,15 +312,9 @@ function RadarBlock({
 }
 
 function statusMeta(status: PlayerStatus) {
-  if (status === 'top') {
-    return { label: 'Top mental', bg: '#e9f7ef', border: '#cfead9', color: '#1f6b43' }
-  }
-  if (status === 'stable') {
-    return { label: 'Stable', bg: '#edf4ff', border: '#d8e5ff', color: '#35528f' }
-  }
-  if (status === 'watch') {
-    return { label: 'À accompagner', bg: '#fff7e8', border: '#f6e2b8', color: '#9a6b00' }
-  }
+  if (status === 'top') return { label: 'Top mental', bg: '#e9f7ef', border: '#cfead9', color: '#1f6b43' }
+  if (status === 'stable') return { label: 'Stable', bg: '#edf4ff', border: '#d8e5ff', color: '#35528f' }
+  if (status === 'watch') return { label: 'À accompagner', bg: '#fff7e8', border: '#f6e2b8', color: '#9a6b00' }
   return { label: 'À risque', bg: '#fff0f0', border: '#f2c9c9', color: '#9f2f2f' }
 }
 
@@ -371,6 +331,8 @@ export default function ClubPage() {
     pmpByPlayer: new Map(),
     psychoByPlayer: new Map()
   })
+
+  const [sending, setSending] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -596,7 +558,7 @@ export default function ClubPage() {
           status = 'stable'
         }
 
-        return { player, cmp, pmp, stress, regulation, status }
+        return { player, cmp, pmp, stress, status }
       })
       .sort((a, b) => {
         const rank = { top: 0, stable: 1, watch: 2, risk: 3 }
@@ -697,6 +659,46 @@ export default function ClubPage() {
 
     return `Rapport Club Pro A4P — ${clubName}`
   }, [state.visibleClubs])
+
+  async function handleSendToCoach() {
+    try {
+      const defaultEmail =
+        state.visibleClubs.length === 1 ? state.visibleClubs[0].contact_email || '' : ''
+
+      const to = prompt('Adresse email du coach ou du responsable club', defaultEmail)
+      if (!to) return
+
+      setSending(true)
+
+      const response = await fetch('/api/send-club-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to,
+          clubName:
+            state.visibleClubs.length === 1
+              ? state.visibleClubs[0].name || 'Club'
+              : 'Rapport club A4P',
+          teamsCount: state.visibleTeams.length,
+          playersCount: state.visiblePlayers.length,
+          portalUrl: 'https://a4-p-platform-v11.vercel.app/club',
+          senderName: getUserName(state.selectedUser)
+        })
+      })
+
+      const json = await response.json()
+
+      if (!response.ok) {
+        throw new Error(json?.error || 'Erreur envoi email.')
+      }
+
+      alert('Email envoyé au coach avec succès.')
+    } catch (error: any) {
+      alert(error?.message || 'Erreur inconnue.')
+    } finally {
+      setSending(false)
+    }
+  }
 
   if (state.loading) {
     return <div style={{ padding: 24 }}>Chargement...</div>
@@ -812,6 +814,22 @@ export default function ClubPage() {
                 }}
               >
                 Exporter PDF club
+              </button>
+
+              <button
+                onClick={handleSendToCoach}
+                disabled={sending}
+                style={{
+                  padding: '12px 16px',
+                  borderRadius: 14,
+                  fontWeight: 800,
+                  background: '#0f9d58',
+                  color: '#ffffff',
+                  border: '1px solid #0f9d58',
+                  opacity: sending ? 0.7 : 1
+                }}
+              >
+                {sending ? 'Envoi...' : 'Envoyer au coach'}
               </button>
 
               <button
