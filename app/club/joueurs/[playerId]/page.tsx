@@ -194,7 +194,7 @@ function getCoachSummary(result?: CmpResultRow | null, radar?: RadarDimensions |
   const score = typeof result?.score_global === 'number' ? result.score_global : null
 
   if (radar) {
-    const ordered = [
+    const ordered: [string, number][] = [
       ['confiance', radar.confiance],
       ['régulation', radar.regulation],
       ['engagement', radar.engagement],
@@ -490,44 +490,46 @@ export default function PlayerPage() {
           .from('players')
           .select('*')
           .eq('id', playerId)
-          .maybeSingle<PlayerRow>()
+          .maybeSingle()
 
         if (playerError) {
           throw new Error(`Erreur players : ${playerError.message}`)
         }
 
-        if (!playerData) {
+        const typedPlayerData = playerData as PlayerRow | null
+
+        if (!typedPlayerData) {
           throw new Error(`Joueur introuvable pour l'id ${playerId}`)
         }
 
         let teamData: TeamRow | null = null
         let clubData: ClubRow | null = null
 
-        if (playerData.team_id) {
+        if (typedPlayerData.team_id) {
           const { data: teamResponse, error: teamError } = await supabase
             .from('teams')
             .select('*')
-            .eq('id', playerData.team_id)
-            .maybeSingle<TeamRow>()
+            .eq('id', typedPlayerData.team_id)
+            .maybeSingle()
 
           if (teamError) {
             throw new Error(`Erreur teams : ${teamError.message}`)
           }
 
-          teamData = teamResponse ?? null
+          teamData = (teamResponse as TeamRow | null) ?? null
 
           if (teamData?.club_id) {
             const { data: clubResponse, error: clubError } = await supabase
               .from('clubs')
               .select('*')
               .eq('id', teamData.club_id)
-              .maybeSingle<ClubRow>()
+              .maybeSingle()
 
             if (clubError) {
               throw new Error(`Erreur clubs : ${clubError.message}`)
             }
 
-            clubData = clubResponse ?? null
+            clubData = (clubResponse as ClubRow | null) ?? null
           }
         }
 
@@ -536,13 +538,12 @@ export default function PlayerPage() {
           .select('*')
           .eq('player_id', playerId)
           .order('created_at', { ascending: false })
-          .returns<PassationRow[]>()
 
         if (passationsError) {
           throw new Error(`Erreur passations : ${passationsError.message}`)
         }
 
-        const passations = passationsData ?? []
+        const passations = ((passationsData as PassationRow[] | null) ?? [])
         const tokens = passations
           .map((item) => item.token)
           .filter((token): token is string => Boolean(token))
@@ -560,14 +561,14 @@ export default function PlayerPage() {
             throw new Error(`Erreur cmp_results : ${cmpError.message}`)
           }
 
-          results = (cmpData as CmpResultRow[]) ?? []
+          results = ((cmpData as CmpResultRow[] | null) ?? [])
         }
 
         if (!cancelled) {
           setState({
             loading: false,
             error: '',
-            player: playerData,
+            player: typedPlayerData,
             team: teamData,
             club: clubData,
             passations,
