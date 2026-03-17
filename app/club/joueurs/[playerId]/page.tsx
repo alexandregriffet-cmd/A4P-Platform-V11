@@ -10,14 +10,12 @@ type Player = {
   firstname?: string | null
   lastname?: string | null
   email?: string | null
-  team_id?: string | null
 }
 
 type Result = {
-  token?: string | null
-  profile_code?: string | null
-  profile_label?: string | null
   score_global?: number | null
+  profile_label?: string | null
+  profile_code?: string | null
   created_at?: string | null
   confiance?: number
   regulation?: number
@@ -60,6 +58,53 @@ function extractRadar(r: Result | null): Radar | null {
   }
 }
 
+function coachInsight(result: Result | null, radar: Radar | null) {
+  if (!result) return "Aucune donnée exploitable pour le moment."
+
+  if (radar) {
+    const ordered = [
+      { key: 'confiance', value: radar.confiance },
+      { key: 'régulation', value: radar.regulation },
+      { key: 'engagement', value: radar.engagement },
+      { key: 'stabilité', value: radar.stabilite }
+    ].sort((a, b) => b.value - a.value)
+
+    const top = ordered[0].key
+
+    return `Le levier mental dominant est la ${top}. Le travail du coach doit s'appuyer sur ce point fort pour stabiliser la performance dans les moments clés.`
+  }
+
+  if (result.score_global && result.score_global < 45) {
+    return "Le joueur nécessite un cadre mental sécurisant avec des routines simples et répétées."
+  }
+
+  if (result.score_global && result.score_global < 65) {
+    return "Le joueur possède une base intéressante mais encore irrégulière. L'enjeu est la stabilisation."
+  }
+
+  return "Le joueur présente une base mentale solide. Travail d'optimisation et de constance recommandé."
+}
+
+function axesProgression(radar: Radar | null) {
+  if (!radar) {
+    return [
+      "Mettre en place des routines mentales",
+      "Renforcer la concentration",
+      "Stabiliser la confiance"
+    ]
+  }
+
+  return [
+    { key: 'confiance', value: radar.confiance, text: "Renforcer la confiance par des repères de réussite" },
+    { key: 'regulation', value: radar.regulation, text: "Améliorer la régulation émotionnelle" },
+    { key: 'engagement', value: radar.engagement, text: "Clarifier l'intention et l'engagement" },
+    { key: 'stabilite', value: radar.stabilite, text: "Développer la stabilité sous pression" }
+  ]
+    .sort((a, b) => a.value - b.value)
+    .slice(0, 3)
+    .map(a => a.text)
+}
+
 export default function Page() {
   const params = useParams()
   const playerId = params?.playerId as string
@@ -72,26 +117,21 @@ export default function Page() {
   useEffect(() => {
     async function load() {
       try {
-        const { data: p, error: pe } = await supabase
+        const { data: p } = await supabase
           .from('players')
           .select('*')
           .eq('id', playerId)
           .single()
 
-        if (pe) throw pe
-
-        const { data: r, error: re } = await supabase
+        const { data: r } = await supabase
           .from('cmp_results')
           .select('*')
           .eq('player_id', playerId)
           .order('created_at', { ascending: false })
           .limit(1)
 
-        if (re) throw re
-
         setPlayer(p)
-        setResult(r?.[0] ?? null)
-
+        setResult(r?.[0] || null)
       } catch (e: any) {
         setError(e.message)
       } finally {
@@ -104,63 +144,65 @@ export default function Page() {
 
   const radar = useMemo(() => extractRadar(result), [result])
 
-  const ordered = radar
-    ? [
-        { key: 'confiance', value: radar.confiance },
-        { key: 'regulation', value: radar.regulation },
-        { key: 'engagement', value: radar.engagement },
-        { key: 'stabilite', value: radar.stabilite }
-      ].sort((a, b) => b.value - a.value)
-    : []
-
   if (loading) return <div style={{ padding: 20 }}>Chargement...</div>
   if (error) return <div style={{ padding: 20 }}>{error}</div>
   if (!player) return <div style={{ padding: 20 }}>Joueur introuvable</div>
 
   return (
-    <main style={{ padding: 24, maxWidth: 900, margin: '0 auto' }}>
+    <main style={{ padding: 24, maxWidth: 1100, margin: '0 auto' }}>
 
       <Link href="/club">← Retour</Link>
 
-      <h1 style={{ marginTop: 20 }}>
+      <h1 style={{ fontSize: 42 }}>
         {player.firstname} {player.lastname}
       </h1>
 
-      <p>Email : {player.email || '—'}</p>
+      <p style={{ opacity: 0.7 }}>{player.email}</p>
 
-      <hr />
+      <section style={{ marginTop: 30 }}>
+        <h2>Score global</h2>
+        <div style={{ fontSize: 36, fontWeight: 800 }}>
+          {result?.score_global ? `${result.score_global}/100` : '—'}
+        </div>
+      </section>
 
-      <h2>Résultat CMP</h2>
+      <section style={{ marginTop: 30 }}>
+        <h2>Profil mental</h2>
+        <div style={{ fontSize: 24, fontWeight: 700 }}>
+          {result?.profile_label || result?.profile_code || '—'}
+        </div>
+      </section>
 
-      <p>
-        Score :
-        {' '}
-        {typeof result?.score_global === 'number'
-          ? `${result.score_global}/100`
-          : '—'}
-      </p>
+      <section style={{ marginTop: 30 }}>
+        <h2>Analyse coach</h2>
+        <p style={{ lineHeight: 1.7 }}>
+          {coachInsight(result, radar)}
+        </p>
+      </section>
 
-      <p>
-        Profil :
-        {' '}
-        {result?.profile_label || result?.profile_code || '—'}
-      </p>
-
-      <hr />
-
-      <h2>Radar mental</h2>
-
-      {!radar && <p>Aucune donnée</p>}
-
-      {radar && (
+      <section style={{ marginTop: 30 }}>
+        <h2>Axes de progression</h2>
         <ul>
-          {ordered.map(item => (
-            <li key={item.key}>
-              {item.key} : {item.value}
-            </li>
+          {axesProgression(radar).map((a, i) => (
+            <li key={i}>{a}</li>
           ))}
         </ul>
-      )}
+      </section>
+
+      <section style={{ marginTop: 30 }}>
+        <h2>Radar mental</h2>
+
+        {!radar && <p>Aucune donnée</p>}
+
+        {radar && (
+          <ul>
+            <li>Confiance : {radar.confiance}</li>
+            <li>Régulation : {radar.regulation}</li>
+            <li>Engagement : {radar.engagement}</li>
+            <li>Stabilité : {radar.stabilite}</li>
+          </ul>
+        )}
+      </section>
 
     </main>
   )
