@@ -1,803 +1,705 @@
-import type { CSSProperties } from 'react'
+'use client'
+
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { createClient } from '@supabase/supabase-js'
+import { useParams } from 'next/navigation'
+import { supabase } from '@/lib/supabaseClient'
 
-type PageProps = {
-  params: {
-    teamId: string
-  }
-}
-
-type TeamRow = {
+type Team = {
   id: string
-  name?: string | null
-  team_name?: string | null
-  season?: string | null
   club_id?: string | null
+  name?: string | null
+  season?: string | null
+  category?: string | null
+  coach_name?: string | null
   created_at?: string | null
 }
 
-type PlayerRow = {
+type Club = {
+  id: string
+  name?: string | null
+  code?: string | null
+  contact_email?: string | null
+}
+
+type Player = {
   id: string
   firstname?: string | null
   lastname?: string | null
   email?: string | null
-  position?: string | null
   team_id?: string | null
-  created_at?: string | null
+  club_id?: string | null
 }
 
-type PassationRow = {
+type CmpResultRow = {
   id?: string | null
   player_id?: string | null
   team_id?: string | null
   club_id?: string | null
-  module?: string | null
-  token?: string | null
-  status?: string | null
-  created_at?: string | null
-}
-
-type CmpResultRow = {
-  token?: string | null
-  module?: string | null
-  firstname?: string | null
-  lastname?: string | null
-  email?: string | null
-  club_structure?: string | null
-  profile_code?: string | null
+  score_global?: number | string | null
   profile_label?: string | null
-  score_global?: number | null
   created_at?: string | null
 }
 
-function getServerClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+type PmpResultRow = {
+  id?: string | null
+  player_id?: string | null
+  team_id?: string | null
+  club_id?: string | null
+  score_global?: number | string | null
+  profile_label?: string | null
+  created_at?: string | null
+}
 
-  if (!url || !key) {
-    throw new Error('Variables Supabase manquantes dans V11.')
+type PsychoResultRow = {
+  id?: string | null
+  player_id?: string | null
+  team_id?: string | null
+  club_id?: string | null
+  stress_level?: number | string | null
+  confidence_level?: number | string | null
+  emotional_control?: number | string | null
+  profile_label?: string | null
+  created_at?: string | null
+}
+
+type PlayerRowView = {
+  id: string
+  name: string
+  email: string
+  cmpScore: number | null
+  pmpScore: number | null
+  stressLevel: number | null
+}
+
+type PageState = {
+  loading: boolean
+  error: string
+  team: Team | null
+  club: Club | null
+  players: Player[]
+  cmpResults: CmpResultRow[]
+  pmpResults: PmpResultRow[]
+  psychoResults: PsychoResultRow[]
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (typeof error === 'string' && error.trim()) return error
+
+  if (error && typeof error === 'object') {
+    const maybeMessage = (error as { message?: unknown }).message
+    if (typeof maybeMessage === 'string' && maybeMessage.trim()) {
+      return maybeMessage
+    }
   }
 
-  return createClient(url, key)
+  return 'Erreur inconnue.'
+}
+
+function normalizeScore(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.max(0, Math.min(100, Math.round(value)))
+  }
+
+  if (typeof value === 'string') {
+    const n = Number(value.replace(',', '.'))
+    if (Number.isFinite(n)) {
+      return Math.max(0, Math.min(100, Math.round(n)))
+    }
+  }
+
+  return null
 }
 
 function formatDate(value?: string | null) {
   if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
+
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return '—'
 
   return new Intl.DateTimeFormat('fr-FR', {
     dateStyle: 'short',
     timeStyle: 'short'
-  }).format(date)
+  }).format(d)
 }
 
-function getFullName(player: { firstname?: string | null; lastname?: string | null }) {
-  const fullName = [player.firstname || '', player.lastname || '']
-    .filter(Boolean)
-    .join(' ')
-    .trim()
-
-  return fullName || 'Sans nom'
+function getPlayerName(player: Player) {
+  const fullName = [player.firstname || '', player.lastname || ''].filter(Boolean).join(' ').trim()
+  return fullName || 'Sportif sans nom'
 }
 
-function getStatusLabel(status?: string | null) {
-  if (status === 'completed') return 'Terminée'
-  if (status === 'in_progress') return 'En cours'
-  if (status === 'sent') return 'Envoyée'
-  if (status === 'pending') return 'À faire'
-  return status || 'Inconnu'
+function average(values: Array<number | null>) {
+  const valid = values.filter((v): v is number => v !== null)
+  if (valid.length === 0) return null
+  return Math.round(valid.reduce((sum, v) => sum + v, 0) / valid.length)
 }
 
-function getStatusStyle(status?: string | null): CSSProperties {
-  if (status === 'completed') {
-    return {
-      background: '#ecfdf3',
-      color: '#067647',
-      border: '1px solid #abefc6'
+function getCollectiveSummary({
+  cmpAverage,
+  pmpAverage,
+  stressAverage,
+  emotionalAverage,
+  playersCount
+}: {
+  cmpAverage: number | null
+  pmpAverage: number | null
+  stressAverage: number | null
+  emotionalAverage: number | null
+  playersCount: number
+}) {
+  const lines: string[] = []
+
+  if (playersCount === 0) {
+    return [
+      "Aucun joueur n’est actuellement rattaché à cette équipe. La lecture collective n’est donc pas encore disponible."
+    ]
+  }
+
+  if (cmpAverage !== null) {
+    if (cmpAverage >= 80) {
+      lines.push("Le niveau mental collectif observé via le CMP apparaît globalement fort et déjà compétitif.")
+    } else if (cmpAverage >= 65) {
+      lines.push("Le CMP collectif montre une base solide, mais encore irrégulière dans la constance d’ensemble.")
+    } else {
+      lines.push("Le CMP collectif suggère une équipe qui a besoin de structuration mentale et de repères plus stables.")
     }
   }
 
-  if (status === 'in_progress') {
-    return {
-      background: '#eff8ff',
-      color: '#175cd3',
-      border: '1px solid #b2ddff'
+  if (pmpAverage !== null) {
+    if (pmpAverage >= 80) {
+      lines.push("Le PMP indique un potentiel de fonctionnement globalement favorable à l’adaptation et à la performance.")
+    } else if (pmpAverage >= 65) {
+      lines.push("Le PMP collectif montre des ressources intéressantes, avec une marge de progression sur la cohérence du fonctionnement.")
+    } else {
+      lines.push("Le PMP collectif laisse penser qu’une partie de l’équipe manque encore de repères mentaux stables dans sa manière de fonctionner.")
     }
   }
 
-  if (status === 'sent') {
-    return {
-      background: '#f5f8ff',
-      color: '#3b5ccc',
-      border: '1px solid #c7d7fe'
+  if (stressAverage !== null) {
+    if (stressAverage >= 70) {
+      lines.push("Le niveau de stress moyen est élevé, ce qui peut impacter la fluidité collective dans les moments à enjeu.")
+    } else if (stressAverage >= 50) {
+      lines.push("Le stress collectif reste présent sans être explosif, mais il mérite d’être mieux canalisé dans les temps clés.")
+    } else {
+      lines.push("Le niveau de stress moyen reste plutôt contenu, ce qui constitue un point d’appui collectif intéressant.")
     }
   }
 
-  return {
-    background: '#f8fafd',
-    color: '#667085',
-    border: '1px solid #d5ddea'
+  if (emotionalAverage !== null) {
+    if (emotionalAverage >= 70) {
+      lines.push("Le contrôle émotionnel collectif semble plutôt solide, ce qui favorise la stabilité de performance.")
+    } else {
+      lines.push("Le contrôle émotionnel collectif semble encore variable, avec un besoin de routines de régulation partagées.")
+    }
   }
+
+  if (lines.length === 0) {
+    lines.push("Les données collectives sont encore insuffisantes pour produire une lecture d’équipe fiable.")
+  }
+
+  return lines
+}
+
+function getPriorityAxes({
+  cmpAverage,
+  stressAverage,
+  emotionalAverage
+}: {
+  cmpAverage: number | null
+  stressAverage: number | null
+  emotionalAverage: number | null
+}) {
+  const axes: Array<{ score: number; text: string }> = []
+
+  axes.push({
+    score: cmpAverage === null ? 999 : cmpAverage,
+    text: "Renforcer les routines mentales collectives pour créer davantage de stabilité entre entraînement et compétition."
+  })
+
+  axes.push({
+    score: emotionalAverage === null ? 999 : emotionalAverage,
+    text: "Travailler la régulation émotionnelle collective avec des protocoles simples, répétés et partagés."
+  })
+
+  axes.push({
+    score: stressAverage === null ? 999 : 100 - stressAverage,
+    text: "Réduire l’impact du stress dans les moments à enjeu par un langage commun, des repères de recentrage et des rôles clarifiés."
+  })
+
+  axes.push({
+    score: 60,
+    text: "Structurer des rituels d’équipe avant, pendant et après match pour homogénéiser la réponse mentale du groupe."
+  })
+
+  return axes
+    .sort((a, b) => a.score - b.score)
+    .slice(0, 3)
+    .map((item) => item.text)
 }
 
 function StatCard({
   value,
-  label
+  label,
+  helper
 }: {
   value: string | number
   label: string
+  helper?: string
 }) {
-  return (
-    <div style={statCardStyle}>
-      <div style={statValueStyle}>{value}</div>
-      <div style={statLabelStyle}>{label}</div>
-    </div>
-  )
-}
-
-export default async function TeamDashboardPage({ params }: PageProps) {
-  const supabase = getServerClient()
-  const teamId = params.teamId
-
-  const { data: team, error: teamError } = await supabase
-    .from('teams')
-    .select('id, name, team_name, season, club_id, created_at')
-    .eq('id', teamId)
-    .single<TeamRow>()
-
-  if (teamError || !team) {
-    return (
-      <main style={pageStyle}>
-        <section style={sectionCardStyle}>
-          <div style={eyebrowStyle}>Dashboard équipe</div>
-          <h1 style={titleStyle}>Équipe introuvable</h1>
-          <p style={leadStyle}>
-            Je n’ai pas trouvé cette équipe dans la base V11.
-          </p>
-          <div style={actionsWrapStyle}>
-            <Link href="/club" style={secondaryButtonStyle}>
-              Retour club
-            </Link>
-          </div>
-        </section>
-      </main>
-    )
-  }
-
-  const playersResponse = await supabase
-    .from('players')
-    .select('id, firstname, lastname, email, position, team_id, created_at')
-    .eq('team_id', teamId)
-    .order('created_at', { ascending: true })
-    .returns<PlayerRow[]>()
-
-  const players: PlayerRow[] = playersResponse.data ?? []
-
-  const passationsResponse = await supabase
-    .from('passations')
-    .select('id, player_id, team_id, club_id, module, token, status, created_at')
-    .eq('team_id', teamId)
-    .order('created_at', { ascending: false })
-    .returns<PassationRow[]>()
-
-  const passations: PassationRow[] = passationsResponse.data ?? []
-
-  const passationTokens = passations
-    .map((item) => item.token)
-    .filter((token): token is string => Boolean(token))
-
-  let cmpResults: CmpResultRow[] = []
-
-  if (passationTokens.length > 0) {
-    const cmpResultsResponse = await supabase
-      .from('cmp_results')
-      .select(
-        'token, module, firstname, lastname, email, club_structure, profile_code, profile_label, score_global, created_at'
-      )
-      .in('token', passationTokens)
-      .returns<CmpResultRow[]>()
-
-    cmpResults = cmpResultsResponse.data ?? []
-  }
-
-  const passationsByPlayerId = new Map<string, PassationRow>()
-  passations.forEach((passation) => {
-    if (passation.player_id && !passationsByPlayerId.has(passation.player_id)) {
-      passationsByPlayerId.set(passation.player_id, passation)
-    }
-  })
-
-  const resultsByToken = new Map<string, CmpResultRow>()
-  cmpResults.forEach((result) => {
-    if (result.token && !resultsByToken.has(result.token)) {
-      resultsByToken.set(result.token, result)
-    }
-  })
-
-  const teamName = team.team_name || team.name || 'Équipe'
-
-  const totalPlayers = players.length
-  const totalPassations = passations.length
-  const responseCount = cmpResults.length
-
-  const completedCount = passations.filter((item) => item.status === 'completed').length
-  const pendingCount = passations.filter((item) => item.status === 'pending').length
-  const inProgressCount = passations.filter((item) => item.status === 'in_progress').length
-  const sentCount = passations.filter((item) => item.status === 'sent').length
-
-  const completionPercent =
-    totalPassations > 0 ? Math.round((completedCount / totalPassations) * 100) : 0
-
-  const scores = cmpResults
-    .map((item) => item.score_global)
-    .filter((score): score is number => typeof score === 'number')
-
-  const averageScore =
-    scores.length > 0
-      ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)
-      : 0
-
-  const latestResultDate =
-    cmpResults.length > 0
-      ? formatDate(
-          cmpResults
-            .slice()
-            .sort((a, b) => {
-              const da = a.created_at ? new Date(a.created_at).getTime() : 0
-              const db = b.created_at ? new Date(b.created_at).getTime() : 0
-              return db - da
-            })[0]?.created_at || null
-        )
-      : '—'
-
-  return (
-    <main style={pageStyle}>
-      <section style={heroCardStyle}>
-        <div style={eyebrowStyle}>Dashboard équipe</div>
-        <h1 style={heroTitleStyle}>{teamName}</h1>
-
-        <div style={pillWrapStyle}>
-          <span style={pillStyle}>ID équipe : {team.id}</span>
-          <span style={pillStyle}>Saison : {team.season || '—'}</span>
-          <span style={pillStyle}>Club : {team.club_id || '—'}</span>
-        </div>
-
-        <div style={actionsWrapStyle}>
-          <Link href="/club" style={secondaryButtonStyle}>
-            Retour club
-          </Link>
-
-          <Link href="/club/import-equipe" style={secondaryButtonStyle}>
-            Import équipe
-          </Link>
-
-          <Link href="/passations" style={primaryButtonStyle}>
-            Voir passations
-          </Link>
-        </div>
-
-        <p style={leadStyle}>
-          Cette page centralise automatiquement les joueurs, les passations,
-          les réponses CMP, la progression de complétion et l’accès direct
-          aux rapports individuels. C’est la version club à montrer en rendez-vous.
-        </p>
-      </section>
-
-      <section style={statsGridStyle}>
-        <StatCard value={totalPlayers} label="joueurs" />
-        <StatCard value={totalPassations} label="passations" />
-        <StatCard value={responseCount} label="réponses CMP" />
-        <StatCard value={averageScore} label="score moyen CMP" />
-        <StatCard value={pendingCount} label="à faire" />
-        <StatCard value={completedCount} label="terminées" />
-        <StatCard value={inProgressCount} label="en cours" />
-        <StatCard value={sentCount} label="envoyées" />
-      </section>
-
-      <section style={sectionCardStyle}>
-        <div style={sectionHeaderStyle}>
-          <h2 style={sectionTitleStyle}>Progression équipe</h2>
-        </div>
-
-        <div style={{ padding: 24, display: 'grid', gap: 22 }}>
-          <div>
-            <div style={progressHeadStyle}>
-              <span>Complétion globale</span>
-              <span>{completionPercent}%</span>
-            </div>
-
-            <div style={progressTrackStyle}>
-              <div
-                style={{
-                  ...progressFillStyle,
-                  width: `${completionPercent}%`
-                }}
-              />
-            </div>
-          </div>
-
-          <div style={statsGridStyle}>
-            <StatCard value={completedCount} label="terminées" />
-            <StatCard value={inProgressCount} label="en cours" />
-            <StatCard value={sentCount} label="envoyées" />
-            <StatCard value={pendingCount} label="à faire" />
-            <StatCard value={responseCount} label="réponses enregistrées" />
-            <StatCard value={averageScore} label="score moyen" />
-            <StatCard value={latestResultDate} label="dernière réponse" />
-            <StatCard value={teamName} label="équipe" />
-          </div>
-        </div>
-      </section>
-
-      <section style={sectionCardStyle}>
-        <div style={sectionHeaderStyle}>
-          <h2 style={sectionTitleStyle}>Joueurs et passations</h2>
-        </div>
-
-        {players.length === 0 ? (
-          <div style={{ padding: 24, fontSize: 19, color: '#667085' }}>
-            Aucun joueur trouvé pour cette équipe.
-          </div>
-        ) : (
-          <div style={playerCardsWrapStyle}>
-            {players.map((player) => {
-              const passation = passationsByPlayerId.get(player.id)
-              const result = passation?.token ? resultsByToken.get(passation.token) : undefined
-              const hasResult = Boolean(result)
-
-              const passationLink = passation?.token
-                ? `/passations/${passation.token}`
-                : null
-
-              const reportLink = passation?.token
-                ? `https://alexandregriffet-cmd.github.io/CMP-A4P-ACADEMIE-DE-PERFORMANCES-/resultats.html?token=${encodeURIComponent(
-                    passation.token
-                  )}`
-                : null
-
-              return (
-                <article key={player.id} style={playerCardStyle}>
-                  <div style={playerTopRowStyle}>
-                    <div>
-                      <div style={playerNameStyle}>{getFullName(player)}</div>
-                      <div style={playerMetaStyle}>
-                        créé le {formatDate(player.created_at)}
-                      </div>
-                    </div>
-
-                    <span
-                      style={{
-                        ...statusPillStyle,
-                        ...getStatusStyle(passation?.status)
-                      }}
-                    >
-                      {getStatusLabel(passation?.status)}
-                    </span>
-                  </div>
-
-                  <div style={infoGridStyle}>
-                    <InfoBox label="Email" value={player.email || '—'} />
-                    <InfoBox label="Module" value={passation?.module || '—'} />
-                    <InfoBox
-                      label="Réponse"
-                      value={hasResult ? 'Oui' : 'Non'}
-                      tone={hasResult ? 'success' : 'neutral'}
-                    />
-                    <InfoBox
-                      label="Score"
-                      value={
-                        typeof result?.score_global === 'number'
-                          ? `${result.score_global}/100`
-                          : '—'
-                      }
-                      strong
-                    />
-                  </div>
-
-                  <div style={profileWrapStyle}>
-                    <div style={profileLabelTitleStyle}>Profil</div>
-                    <div style={profilePillStyle}>
-                      {result?.profile_label || 'Rapport non disponible'}
-                    </div>
-                  </div>
-
-                  <div style={tokenBoxStyle}>
-                    <div style={tokenTitleStyle}>Token de passation</div>
-                    <div style={tokenValueStyle}>{passation?.token || '—'}</div>
-                  </div>
-
-                  <div style={datesGridStyle}>
-                    <InfoBox label="Date passation" value={formatDate(passation?.created_at || null)} />
-                    <InfoBox label="Date réponse" value={formatDate(result?.created_at || null)} />
-                  </div>
-
-                  <div style={cardActionsStyle}>
-                    {passationLink ? (
-                      <Link href={passationLink} style={secondaryButtonStyle}>
-                        Ouvrir passation
-                      </Link>
-                    ) : (
-                      <span style={disabledButtonStyle}>Passation indisponible</span>
-                    )}
-
-                    {reportLink && hasResult ? (
-                      <a
-                        href={reportLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={primaryButtonStyle}
-                      >
-                        Voir rapport individuel
-                      </a>
-                    ) : (
-                      <span style={disabledButtonStyle}>Rapport non disponible</span>
-                    )}
-                  </div>
-                </article>
-              )
-            })}
-          </div>
-        )}
-      </section>
-    </main>
-  )
-}
-
-function InfoBox({
-  label,
-  value,
-  strong = false,
-  tone = 'neutral'
-}: {
-  label: string
-  value: string
-  strong?: boolean
-  tone?: 'neutral' | 'success'
-}) {
-  const toneStyles =
-    tone === 'success'
-      ? {
-          background: '#ecfdf3',
-          border: '1px solid #abefc6',
-          color: '#067647'
-        }
-      : {
-          background: '#f8fafd',
-          border: '1px solid #dce4f1',
-          color: '#1e2b45'
-        }
-
   return (
     <div
       style={{
-        ...infoBoxStyle,
-        ...toneStyles
+        background: '#ffffff',
+        borderRadius: 20,
+        padding: 22,
+        boxShadow: '0 10px 30px rgba(20,30,60,0.08)'
       }}
     >
-      <div style={infoBoxLabelStyle}>{label}</div>
       <div
         style={{
-          ...infoBoxValueStyle,
-          fontWeight: strong ? 900 : 700
+          fontSize: 34,
+          fontWeight: 900,
+          color: '#1f3158',
+          marginBottom: 8,
+          wordBreak: 'break-word'
         }}
       >
         {value}
       </div>
+      <div style={{ fontSize: 16, fontWeight: 700, color: '#667085' }}>{label}</div>
+      {helper ? (
+        <div style={{ marginTop: 8, fontSize: 14, color: '#8a96ad', lineHeight: 1.5 }}>
+          {helper}
+        </div>
+      ) : null}
     </div>
   )
 }
 
-const pageStyle: CSSProperties = {
-  maxWidth: 1440,
-  margin: '0 auto',
-  padding: 24,
-  display: 'grid',
-  gap: 24
+function SectionCard({
+  title,
+  children
+}: {
+  title: string
+  children: any
+}) {
+  return (
+    <div
+      style={{
+        background: '#ffffff',
+        borderRadius: 24,
+        padding: 24,
+        boxShadow: '0 10px 30px rgba(20,30,60,0.08)'
+      }}
+    >
+      <h2 style={{ marginTop: 0, marginBottom: 18, fontSize: 34, color: '#182847' }}>{title}</h2>
+      {children}
+    </div>
+  )
 }
 
-const heroCardStyle: CSSProperties = {
-  background: '#fff',
-  borderRadius: 28,
-  padding: 28,
-  boxShadow: '0 14px 40px rgba(21,37,69,0.08)',
-  display: 'grid',
-  gap: 18
-}
+export default function TeamPage() {
+  const params = useParams()
+  const teamId = Array.isArray(params?.teamId) ? params.teamId[0] : params?.teamId || ''
 
-const sectionCardStyle: CSSProperties = {
-  background: '#fff',
-  borderRadius: 28,
-  boxShadow: '0 14px 40px rgba(21,37,69,0.08)',
-  overflow: 'hidden'
-}
+  const [state, setState] = useState<PageState>({
+    loading: true,
+    error: '',
+    team: null,
+    club: null,
+    players: [],
+    cmpResults: [],
+    pmpResults: [],
+    psychoResults: []
+  })
 
-const sectionHeaderStyle: CSSProperties = {
-  padding: 24,
-  borderBottom: '1px solid #e2e8f4'
-}
+  useEffect(() => {
+    let cancelled = false
 
-const eyebrowStyle: CSSProperties = {
-  fontSize: 13,
-  fontWeight: 800,
-  letterSpacing: '0.16em',
-  textTransform: 'uppercase',
-  color: '#6f7f9d'
-}
+    async function load() {
+      try {
+        setState({
+          loading: true,
+          error: '',
+          team: null,
+          club: null,
+          players: [],
+          cmpResults: [],
+          pmpResults: [],
+          psychoResults: []
+        })
 
-const titleStyle: CSSProperties = {
-  margin: 0,
-  fontSize: 42,
-  lineHeight: 1,
-  color: '#16233b'
-}
+        if (!teamId) {
+          throw new Error("Identifiant équipe manquant.")
+        }
 
-const heroTitleStyle: CSSProperties = {
-  margin: 0,
-  fontSize: 56,
-  lineHeight: 1,
-  color: '#16233b',
-  wordBreak: 'break-word'
-}
+        const { data: teamData, error: teamError } = await supabase
+          .from('teams')
+          .select('*')
+          .eq('id', teamId)
+          .maybeSingle()
 
-const sectionTitleStyle: CSSProperties = {
-  margin: 0,
-  fontSize: 44,
-  lineHeight: 1,
-  color: '#16233b'
-}
+        if (teamError) {
+          throw new Error(`teams: ${teamError.message}`)
+        }
 
-const leadStyle: CSSProperties = {
-  margin: 0,
-  fontSize: 18,
-  lineHeight: 1.8,
-  color: '#5f6f8e',
-  maxWidth: 980
-}
+        const team = (teamData as Team | null) ?? null
 
-const pillWrapStyle: CSSProperties = {
-  display: 'flex',
-  gap: 10,
-  flexWrap: 'wrap'
-}
+        if (!team) {
+          throw new Error(`Équipe introuvable pour l'id ${teamId}`)
+        }
 
-const pillStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  padding: '10px 14px',
-  borderRadius: 999,
-  background: '#eef2ff',
-  color: '#34518b',
-  fontWeight: 700
-}
+        let club: Club | null = null
 
-const actionsWrapStyle: CSSProperties = {
-  display: 'flex',
-  gap: 12,
-  flexWrap: 'wrap'
-}
+        if (team.club_id) {
+          const { data: clubData, error: clubError } = await supabase
+            .from('clubs')
+            .select('*')
+            .eq('id', team.club_id)
+            .maybeSingle()
 
-const primaryButtonStyle: CSSProperties = {
-  textDecoration: 'none',
-  padding: '14px 18px',
-  borderRadius: 16,
-  border: 'none',
-  color: '#fff',
-  background: 'linear-gradient(135deg, #2f4d85 0%, #395da0 100%)',
-  fontWeight: 800,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  boxShadow: '0 8px 22px rgba(47, 77, 133, 0.22)'
-}
+          if (clubError) {
+            throw new Error(`clubs: ${clubError.message}`)
+          }
 
-const secondaryButtonStyle: CSSProperties = {
-  textDecoration: 'none',
-  padding: '14px 18px',
-  borderRadius: 16,
-  border: '1px solid #d5ddea',
-  color: '#173A73',
-  background: '#fff',
-  fontWeight: 800,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center'
-}
+          club = (clubData as Club | null) ?? null
+        }
 
-const disabledButtonStyle: CSSProperties = {
-  padding: '14px 18px',
-  borderRadius: 16,
-  border: '1px solid #d5ddea',
-  color: '#98a2b3',
-  background: '#f8fafd',
-  fontWeight: 800,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center'
-}
+        const { data: playersData, error: playersError } = await supabase
+          .from('players')
+          .select('*')
+          .eq('team_id', teamId)
+          .order('created_at', { ascending: false })
 
-const statsGridStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-  gap: 18
-}
+        if (playersError) {
+          throw new Error(`players: ${playersError.message}`)
+        }
 
-const statCardStyle: CSSProperties = {
-  background: '#fff',
-  borderRadius: 24,
-  padding: 24,
-  boxShadow: '0 14px 40px rgba(21,37,69,0.08)'
-}
+        const players = (playersData as Player[] | null) ?? []
+        const playerIds = players.map((p) => p.id)
 
-const statValueStyle: CSSProperties = {
-  fontSize: 58,
-  lineHeight: 1,
-  fontWeight: 900,
-  color: '#223461',
-  marginBottom: 14,
-  wordBreak: 'break-word'
-}
+        let cmpResults: CmpResultRow[] = []
+        let pmpResults: PmpResultRow[] = []
+        let psychoResults: PsychoResultRow[] = []
 
-const statLabelStyle: CSSProperties = {
-  fontSize: 19,
-  lineHeight: 1.35,
-  fontWeight: 700,
-  color: '#667085'
-}
+        if (playerIds.length > 0) {
+          const { data: cmpData, error: cmpError } = await supabase
+            .from('cmp_results')
+            .select('*')
+            .in('player_id', playerIds)
+            .order('created_at', { ascending: false })
 
-const progressHeadStyle: CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  fontWeight: 800,
-  color: '#223461',
-  marginBottom: 8,
-  fontSize: 18
-}
+          if (cmpError) {
+            throw new Error(`cmp_results: ${cmpError.message}`)
+          }
 
-const progressTrackStyle: CSSProperties = {
-  height: 18,
-  borderRadius: 999,
-  background: '#e8edf7',
-  overflow: 'hidden'
-}
+          const { data: pmpData, error: pmpError } = await supabase
+            .from('pmp_results')
+            .select('*')
+            .in('player_id', playerIds)
+            .order('created_at', { ascending: false })
 
-const progressFillStyle: CSSProperties = {
-  height: '100%',
-  background: 'linear-gradient(90deg, #2f4d85 0%, #7896dd 100%)'
-}
+          if (pmpError) {
+            throw new Error(`pmp_results: ${pmpError.message}`)
+          }
 
-const playerCardsWrapStyle: CSSProperties = {
-  padding: 24,
-  display: 'grid',
-  gap: 18
-}
+          const { data: psychoData, error: psychoError } = await supabase
+            .from('psycho_results')
+            .select('*')
+            .in('player_id', playerIds)
+            .order('created_at', { ascending: false })
 
-const playerCardStyle: CSSProperties = {
-  border: '1px solid #e2e8f4',
-  borderRadius: 24,
-  background: '#fbfcff',
-  padding: 20,
-  display: 'grid',
-  gap: 18
-}
+          if (psychoError) {
+            throw new Error(`psycho_results: ${psychoError.message}`)
+          }
 
-const playerTopRowStyle: CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  gap: 12,
-  alignItems: 'flex-start',
-  flexWrap: 'wrap'
-}
+          cmpResults = (cmpData as CmpResultRow[] | null) ?? []
+          pmpResults = (pmpData as PmpResultRow[] | null) ?? []
+          psychoResults = (psychoData as PsychoResultRow[] | null) ?? []
+        }
 
-const playerNameStyle: CSSProperties = {
-  fontSize: 30,
-  fontWeight: 900,
-  color: '#16233b',
-  lineHeight: 1.1
-}
+        if (!cancelled) {
+          setState({
+            loading: false,
+            error: '',
+            team,
+            club,
+            players,
+            cmpResults,
+            pmpResults,
+            psychoResults
+          })
+        }
+      } catch (error: unknown) {
+        if (!cancelled) {
+          setState({
+            loading: false,
+            error: getErrorMessage(error),
+            team: null,
+            club: null,
+            players: [],
+            cmpResults: [],
+            pmpResults: [],
+            psychoResults: []
+          })
+        }
+      }
+    }
 
-const playerMetaStyle: CSSProperties = {
-  marginTop: 6,
-  fontSize: 14,
-  color: '#667085'
-}
+    void load()
 
-const statusPillStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  padding: '8px 12px',
-  borderRadius: 999,
-  fontWeight: 800
-}
+    return () => {
+      cancelled = true
+    }
+  }, [teamId])
 
-const infoGridStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-  gap: 12
-}
+  const cmpLatestByPlayer = useMemo(() => {
+    const map = new Map<string, CmpResultRow>()
+    for (const item of state.cmpResults) {
+      const playerId = typeof item.player_id === 'string' ? item.player_id : null
+      if (playerId && !map.has(playerId)) map.set(playerId, item)
+    }
+    return map
+  }, [state.cmpResults])
 
-const infoBoxStyle: CSSProperties = {
-  borderRadius: 18,
-  padding: 14
-}
+  const pmpLatestByPlayer = useMemo(() => {
+    const map = new Map<string, PmpResultRow>()
+    for (const item of state.pmpResults) {
+      const playerId = typeof item.player_id === 'string' ? item.player_id : null
+      if (playerId && !map.has(playerId)) map.set(playerId, item)
+    }
+    return map
+  }, [state.pmpResults])
 
-const infoBoxLabelStyle: CSSProperties = {
-  fontSize: 13,
-  fontWeight: 800,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
-  color: '#6f7f9d',
-  marginBottom: 8
-}
+  const psychoLatestByPlayer = useMemo(() => {
+    const map = new Map<string, PsychoResultRow>()
+    for (const item of state.psychoResults) {
+      const playerId = typeof item.player_id === 'string' ? item.player_id : null
+      if (playerId && !map.has(playerId)) map.set(playerId, item)
+    }
+    return map
+  }, [state.psychoResults])
 
-const infoBoxValueStyle: CSSProperties = {
-  fontSize: 18,
-  color: '#1e2b45',
-  lineHeight: 1.4,
-  wordBreak: 'break-word'
-}
+  const rows: PlayerRowView[] = useMemo(() => {
+    return state.players.map((player) => {
+      const cmp = cmpLatestByPlayer.get(player.id)
+      const pmp = pmpLatestByPlayer.get(player.id)
+      const psycho = psychoLatestByPlayer.get(player.id)
 
-const profileWrapStyle: CSSProperties = {
-  display: 'grid',
-  gap: 8
-}
+      return {
+        id: player.id,
+        name: getPlayerName(player),
+        email: player.email || '—',
+        cmpScore: normalizeScore(cmp?.score_global),
+        pmpScore: normalizeScore(pmp?.score_global),
+        stressLevel: normalizeScore(psycho?.stress_level)
+      }
+    })
+  }, [state.players, cmpLatestByPlayer, pmpLatestByPlayer, psychoLatestByPlayer])
 
-const profileLabelTitleStyle: CSSProperties = {
-  fontSize: 13,
-  fontWeight: 800,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
-  color: '#6f7f9d'
-}
+  const cmpAverage = useMemo(() => average(rows.map((r) => r.cmpScore)), [rows])
+  const pmpAverage = useMemo(() => average(rows.map((r) => r.pmpScore)), [rows])
+  const stressAverage = useMemo(() => average(rows.map((r) => r.stressLevel)), [rows])
+  const emotionalAverage = useMemo(
+    () =>
+      average(
+        state.players.map((player) => {
+          const psycho = psychoLatestByPlayer.get(player.id)
+          return normalizeScore(psycho?.emotional_control)
+        })
+      ),
+    [state.players, psychoLatestByPlayer]
+  )
 
-const profilePillStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  width: 'fit-content',
-  maxWidth: '100%',
-  padding: '12px 16px',
-  borderRadius: 999,
-  background: '#eef2ff',
-  color: '#34518b',
-  fontWeight: 800,
-  fontSize: 16,
-  lineHeight: 1.4,
-  wordBreak: 'break-word'
-}
+  const collectiveSummary = getCollectiveSummary({
+    cmpAverage,
+    pmpAverage,
+    stressAverage,
+    emotionalAverage,
+    playersCount: state.players.length
+  })
 
-const tokenBoxStyle: CSSProperties = {
-  background: '#0c244b',
-  color: '#eef4ff',
-  borderRadius: 18,
-  padding: 16
-}
+  const priorityAxes = getPriorityAxes({
+    cmpAverage,
+    stressAverage,
+    emotionalAverage
+  })
 
-const tokenTitleStyle: CSSProperties = {
-  fontSize: 13,
-  fontWeight: 800,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
-  color: '#cbd8ff',
-  marginBottom: 8
-}
+  if (state.loading) {
+    return <div style={{ padding: 20 }}>Chargement...</div>
+  }
 
-const tokenValueStyle: CSSProperties = {
-  fontFamily: 'monospace',
-  fontSize: 14,
-  lineHeight: 1.7,
-  wordBreak: 'break-all'
-}
+  if (state.error) {
+    return (
+      <div style={{ padding: 20 }}>
+        <h1>Accès indisponible</h1>
+        <p>{state.error}</p>
+        <Link href="/club">Retour club</Link>
+      </div>
+    )
+  }
 
-const datesGridStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-  gap: 12
-}
+  if (!state.team) {
+    return (
+      <div style={{ padding: 20 }}>
+        <h1>Équipe introuvable</h1>
+        <Link href="/club">Retour club</Link>
+      </div>
+    )
+  }
 
-const cardActionsStyle: CSSProperties = {
-  display: 'flex',
-  gap: 12,
-  flexWrap: 'wrap'
+  return (
+    <main style={{ maxWidth: 1280, margin: '0 auto', padding: 24, background: '#eef2f7' }}>
+      <div style={{ marginBottom: 20 }}>
+        <Link href="/club">← Retour club</Link>
+      </div>
+
+      <section
+        style={{
+          background: 'linear-gradient(135deg, #ffffff 0%, #f8fbff 100%)',
+          borderRadius: 28,
+          padding: 28,
+          boxShadow: '0 14px 40px rgba(21,37,69,0.08)',
+          marginBottom: 24
+        }}
+      >
+        <h1 style={{ margin: 0, fontSize: 48, lineHeight: 1.02, color: '#182847' }}>
+          {state.team.name || 'Équipe sans nom'}
+        </h1>
+        <p style={{ margin: '14px 0 0 0', fontSize: 18, color: '#667085', lineHeight: 1.7 }}>
+          Club : {state.club?.name || '—'} · Saison : {state.team.season || '—'} · Catégorie :{' '}
+          {state.team.category || '—'} · Coach : {state.team.coach_name || '—'}
+        </p>
+      </section>
+
+      <section
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: 18,
+          marginBottom: 24
+        }}
+      >
+        <StatCard value={state.players.length} label="Joueurs" />
+        <StatCard value={cmpAverage !== null ? `${cmpAverage}/100` : '—'} label="Moyenne CMP" />
+        <StatCard value={pmpAverage !== null ? `${pmpAverage}/100` : '—'} label="Moyenne PMP" />
+        <StatCard value={stressAverage !== null ? `${stressAverage}/100` : '—'} label="Stress moyen" />
+      </section>
+
+      <section
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))',
+          gap: 24,
+          marginBottom: 24
+        }}
+      >
+        <SectionCard title="Synthèse collective équipe">
+          <div style={{ display: 'grid', gap: 16 }}>
+            {collectiveSummary.map((line, index) => (
+              <p key={index} style={{ margin: 0, lineHeight: 1.8, color: '#44516d', fontSize: 17 }}>
+                {line}
+              </p>
+            ))}
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Axes collectifs prioritaires">
+          <div style={{ display: 'grid', gap: 12 }}>
+            {priorityAxes.map((axis, index) => (
+              <div
+                key={`${axis}-${index}`}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '40px 1fr',
+                  gap: 12,
+                  alignItems: 'start'
+                }}
+              >
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 999,
+                    background: '#e9efff',
+                    color: '#35528f',
+                    fontWeight: 900,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  {index + 1}
+                </div>
+                <div style={{ lineHeight: 1.7, color: '#44516d', fontWeight: 700 }}>{axis}</div>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      </section>
+
+      <SectionCard title="Joueurs de l’équipe">
+        {rows.length === 0 ? (
+          <p style={{ margin: 0, color: '#667085' }}>Aucun joueur rattaché à cette équipe.</p>
+        ) : (
+          <div style={{ display: 'grid', gap: 14 }}>
+            {rows.map((row) => (
+              <div
+                key={row.id}
+                style={{
+                  border: '1px solid #e2e8f4',
+                  borderRadius: 18,
+                  background: '#f8fbff',
+                  padding: 18
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: 16,
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    marginBottom: 12
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: 22, fontWeight: 900, color: '#1f3158' }}>{row.name}</div>
+                    <div style={{ fontSize: 14, color: '#667085' }}>{row.email}</div>
+                  </div>
+
+                  <Link
+                    href={`/club/joueurs/${row.id}`}
+                    style={{
+                      textDecoration: 'none',
+                      padding: '10px 14px',
+                      borderRadius: 14,
+                      color: '#ffffff',
+                      background: '#35528f',
+                      fontWeight: 800
+                    }}
+                  >
+                    Voir la fiche joueur
+                  </Link>
+                </div>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+                    gap: 12
+                  }}
+                >
+                  <StatCard value={row.cmpScore !== null ? `${row.cmpScore}/100` : '—'} label="CMP" />
+                  <StatCard value={row.pmpScore !== null ? `${row.pmpScore}/100` : '—'} label="PMP" />
+                  <StatCard value={row.stressLevel !== null ? `${row.stressLevel}/100` : '—'} label="Stress" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </SectionCard>
+    </main>
+  )
 }
