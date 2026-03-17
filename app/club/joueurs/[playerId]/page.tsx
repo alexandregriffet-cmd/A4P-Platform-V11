@@ -13,7 +13,7 @@ type Player = {
   team_id?: string | null
 }
 
-type ResultRow = {
+type CmpResultRow = {
   id?: string | null
   player_id?: string | null
   score_global?: number | string | null
@@ -29,6 +29,35 @@ type ResultRow = {
   [key: string]: unknown
 }
 
+type PmpResultRow = {
+  id?: string | null
+  player_id?: string | null
+  profile_code?: string | null
+  profile_label?: string | null
+  score_global?: number | string | null
+  decision_style?: string | null
+  focus_mode?: string | null
+  strengths?: string | null
+  vigilance_points?: string | null
+  raw_payload?: unknown
+  created_at?: string | null
+  [key: string]: unknown
+}
+
+type PsychoResultRow = {
+  id?: string | null
+  player_id?: string | null
+  stress_level?: number | string | null
+  confidence_level?: number | string | null
+  emotional_control?: number | string | null
+  fear_factor?: number | string | null
+  blockages?: string | null
+  profile_label?: string | null
+  raw_payload?: unknown
+  created_at?: string | null
+  [key: string]: unknown
+}
+
 type Radar = {
   confiance: number
   regulation: number
@@ -40,7 +69,9 @@ type PageState = {
   loading: boolean
   error: string
   player: Player | null
-  result: ResultRow | null
+  cmp: CmpResultRow | null
+  pmp: PmpResultRow | null
+  psycho: PsychoResultRow | null
 }
 
 function getErrorMessage(error: unknown): string {
@@ -90,7 +121,7 @@ function getPlayerName(player: Player | null) {
   return fullName || 'Sportif sans nom'
 }
 
-function extractRadar(result: ResultRow | null): Radar | null {
+function extractRadar(result: CmpResultRow | null): Radar | null {
   if (!result) return null
 
   const confiance = normalizeScore(result.confiance ?? result.confidence)
@@ -161,6 +192,14 @@ function SectionCard({
       <h2 style={{ marginTop: 0, marginBottom: 18, fontSize: 34, color: '#182847' }}>{title}</h2>
       {children}
     </div>
+  )
+}
+
+function EmptyCard({ title, text }: { title: string; text: string }) {
+  return (
+    <SectionCard title={title}>
+      <p style={{ margin: 0, color: '#667085', lineHeight: 1.7 }}>{text}</p>
+    </SectionCard>
   )
 }
 
@@ -258,212 +297,72 @@ function RadarChart({ radar }: { radar: Radar | null }) {
   )
 }
 
-function getDominantDimension(radar: Radar | null) {
-  if (!radar) return null
-
-  const items = [
-    { key: 'confiance', value: radar.confiance },
-    { key: 'régulation', value: radar.regulation },
-    { key: 'engagement', value: radar.engagement },
-    { key: 'stabilité', value: radar.stabilite }
-  ].sort((a, b) => b.value - a.value)
-
-  return items[0]?.key ?? null
-}
-
-function getWeakestDimension(radar: Radar | null) {
-  if (!radar) return null
-
-  const items = [
-    { key: 'confiance', value: radar.confiance },
-    { key: 'régulation', value: radar.regulation },
-    { key: 'engagement', value: radar.engagement },
-    { key: 'stabilité', value: radar.stabilite }
-  ].sort((a, b) => a.value - b.value)
-
-  return items[0]?.key ?? null
-}
-
-function getProfileSummary(profile: string | null | undefined) {
-  if (!profile || typeof profile !== 'string') {
-    return "Le profil du joueur n’est pas encore défini avec précision. L’analyse reste générale et nécessite des données complémentaires pour être affinée."
-  }
-
-  const value = profile.toLowerCase()
-
-  if (value.includes('explorateur')) {
-    return "Le profil explorateur stratégique renvoie à un fonctionnement orienté vers l’adaptation, l’anticipation et la recherche de solutions. Le joueur a tendance à lire vite les situations, à s’ajuster en fonction du contexte et à mobiliser ses ressources lorsqu’il perçoit du sens dans l’action."
-  }
-
-  if (value.includes('leader')) {
-    return "Le profil de leader traduit souvent une orientation vers l’initiative, l’impact et la prise de responsabilités. Le joueur cherche à peser sur le jeu et à donner une direction claire à son action."
-  }
-
-  if (value.includes('analytique')) {
-    return "Le profil analytique renvoie généralement à un besoin de compréhension, de structure et de maîtrise. Le joueur performe mieux lorsqu’il dispose de repères clairs et d’un cadre cohérent."
-  }
-
-  return "Le profil actuel donne une première lecture utile du fonctionnement mental du joueur. Il sert surtout de repère pour orienter l’accompagnement et prioriser les leviers de progression."
-}
-
-function getScoreSummary(score: number | null) {
-  if (score === null) {
-    return "Aucun score global n’est disponible pour le moment."
-  }
-
-  if (score < 45) {
-    return "Le score global situe actuellement le joueur dans une zone fragile. L’enjeu prioritaire est de recréer de la sécurité mentale, de la répétition et des repères simples."
-  }
-
-  if (score < 65) {
-    return "Le score global montre une base présente mais encore irrégulière. Le joueur dispose de ressources, mais elles ne se stabilisent pas encore suffisamment dans la durée ou sous pression."
-  }
-
-  if (score < 80) {
-    return "Le score global indique une base mentale solide. Le joueur possède déjà des appuis fiables, avec un potentiel clair de progression vers davantage de constance."
-  }
-
-  return "Le score global place le joueur dans une zone forte. La structure mentale semble globalement robuste, avec un potentiel d’optimisation plus que de reconstruction."
-}
-
-function getDimensionSummary(radar: Radar | null) {
-  if (!radar) {
-    return "Les dimensions détaillées ne sont pas encore disponibles, ce qui limite la finesse de lecture du fonctionnement mental."
-  }
-
-  const dominant = getDominantDimension(radar)
-  const weakest = getWeakestDimension(radar)
-
-  return `Le point d’appui principal semble être la ${dominant}. À l’inverse, la ${weakest} apparaît comme le levier le plus vulnérable à court terme. Cela signifie que le travail doit s’appuyer sur le point fort existant tout en sécurisant en priorité la zone la plus instable.`
-}
-
-function getPriorityAxes(radar: Radar | null, score: number | null) {
-  if (!radar) {
-    return [
-      'Installer des routines mentales courtes avant entraînement et compétition.',
-      'Structurer un protocole simple de concentration et de recentrage.',
-      'Créer des repères de confiance observables et répétables.'
-    ]
-  }
-
-  const items = [
-    {
-      key: 'confiance',
-      value: radar.confiance,
-      text: 'Renforcer la confiance avec des repères de réussite concrets et répétés.'
-    },
-    {
-      key: 'regulation',
-      value: radar.regulation,
-      text: 'Développer la régulation émotionnelle pour mieux absorber la pression et les variations de match.'
-    },
-    {
-      key: 'engagement',
-      value: radar.engagement,
-      text: "Clarifier l'intention d'action et maintenir l'engagement jusqu'au bout de la séquence."
-    },
-    {
-      key: 'stabilite',
-      value: radar.stabilite,
-      text: 'Construire davantage de stabilité mentale dans la durée et dans les moments à enjeu.'
-    }
-  ]
-    .sort((a, b) => a.value - b.value)
-    .slice(0, 3)
-    .map((item) => item.text)
-
-  if (score !== null && score >= 80) {
-    return [
-      items[0],
-      'Transformer les points forts actuels en routines de haut niveau.',
-      'Travailler la précision mentale et la répétabilité sous pression.'
-    ]
-  }
-
-  return items
-}
-
-function SyntheseA4P({
-  profile,
-  score,
-  radar
+function PreSyntheseCroisee({
+  cmp,
+  pmp,
+  psycho
 }: {
-  profile: string | null | undefined
-  score: number | null
-  radar: Radar | null
+  cmp: CmpResultRow | null
+  pmp: PmpResultRow | null
+  psycho: PsychoResultRow | null
 }) {
-  const profileSummary = getProfileSummary(profile)
-  const scoreSummary = getScoreSummary(score)
-  const dimensionSummary = getDimensionSummary(radar)
-  const axes = getPriorityAxes(radar, score)
+  const cmpScore = normalizeScore(cmp?.score_global)
+  const pmpScore = normalizeScore(pmp?.score_global)
+  const stress = normalizeScore(psycho?.stress_level)
+  const confidence = normalizeScore(psycho?.confidence_level)
+  const emotionalControl = normalizeScore(psycho?.emotional_control)
+
+  const lines: string[] = []
+
+  if (cmpScore !== null) {
+    if (cmpScore >= 80) {
+      lines.push("Le CMP montre actuellement une base mentale forte et déjà exploitable en situation de performance.")
+    } else if (cmpScore >= 65) {
+      lines.push("Le CMP met en évidence une base mentale solide mais encore perfectible dans la régularité.")
+    } else {
+      lines.push("Le CMP suggère une base mentale encore instable qui demande de la structuration.")
+    }
+  }
+
+  if (pmp?.profile_label || pmp?.profile_code) {
+    lines.push(
+      `Le PMP décrit un fonctionnement dominant de type ${pmp?.profile_label || pmp?.profile_code}, ce qui aide à comprendre comment le joueur traite l’information et entre dans l’action.`
+    )
+  }
+
+  if (stress !== null || confidence !== null || emotionalControl !== null) {
+    const stressText =
+      stress === null ? '' : stress >= 70 ? 'une charge de stress élevée' : 'une charge de stress plutôt contenue'
+    const confidenceText =
+      confidence === null
+        ? ''
+        : confidence >= 70
+          ? 'un socle de confiance intéressant'
+          : 'une confiance encore fragile'
+    const regulationText =
+      emotionalControl === null
+        ? ''
+        : emotionalControl >= 70
+          ? 'une régulation émotionnelle relativement solide'
+          : 'une régulation émotionnelle encore instable'
+
+    lines.push(
+      `Sur le plan psycho-émotionnel, on observe ${stressText}${stressText && (confidenceText || regulationText) ? ', ' : ''}${confidenceText}${confidenceText && regulationText ? ' et ' : ''}${regulationText}.`
+    )
+  }
+
+  if (lines.length === 0) {
+    lines.push("La synthèse croisée n’est pas encore disponible car les trois sources de données ne sont pas suffisamment renseignées.")
+  }
 
   return (
-    <SectionCard title="Synthèse automatique A4P">
-      <div style={{ display: 'grid', gap: 18 }}>
-        <p style={{ margin: 0, lineHeight: 1.8, color: '#44516d', fontSize: 17 }}>
-          {profileSummary}
-        </p>
-
-        <p style={{ margin: 0, lineHeight: 1.8, color: '#44516d', fontSize: 17 }}>
-          {scoreSummary}
-        </p>
-
-        <p style={{ margin: 0, lineHeight: 1.8, color: '#44516d', fontSize: 17 }}>
-          {dimensionSummary}
-        </p>
-
-        <div
-          style={{
-            padding: 18,
-            borderRadius: 18,
-            background: '#f8fbff',
-            border: '1px solid #dbe5f4'
-          }}
-        >
-          <div
-            style={{
-              fontSize: 15,
-              fontWeight: 900,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              color: '#60708f',
-              marginBottom: 12
-            }}
-          >
-            Axes de travail prioritaires
-          </div>
-
-          <div style={{ display: 'grid', gap: 12 }}>
-            {axes.map((axis, index) => (
-              <div
-                key={`${axis}-${index}`}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '40px 1fr',
-                  gap: 12,
-                  alignItems: 'start'
-                }}
-              >
-                <div
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 999,
-                    background: '#e9efff',
-                    color: '#35528f',
-                    fontWeight: 900,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  {index + 1}
-                </div>
-                <div style={{ lineHeight: 1.7, color: '#44516d', fontWeight: 700 }}>{axis}</div>
-              </div>
-            ))}
-          </div>
-        </div>
+    <SectionCard title="Pré-synthèse croisée A4P">
+      <div style={{ display: 'grid', gap: 16 }}>
+        {lines.map((line, index) => (
+          <p key={index} style={{ margin: 0, lineHeight: 1.8, color: '#44516d', fontSize: 17 }}>
+            {line}
+          </p>
+        ))}
       </div>
     </SectionCard>
   )
@@ -479,7 +378,9 @@ export default function PlayerPage() {
     loading: true,
     error: '',
     player: null,
-    result: null
+    cmp: null,
+    pmp: null,
+    psycho: null
   })
 
   useEffect(() => {
@@ -491,7 +392,9 @@ export default function PlayerPage() {
           loading: true,
           error: '',
           player: null,
-          result: null
+          cmp: null,
+          pmp: null,
+          psycho: null
         })
 
         if (!playerId) {
@@ -516,31 +419,59 @@ export default function PlayerPage() {
               loading: false,
               error: '',
               player: null,
-              result: null
+              cmp: null,
+              pmp: null,
+              psycho: null
             })
           }
           return
         }
 
-        const { data: resultData, error: resultError } = await supabase
+        const { data: cmpData, error: cmpError } = await supabase
           .from('cmp_results')
           .select('*')
           .eq('player_id', playerId)
           .order('created_at', { ascending: false })
           .limit(1)
 
-        if (resultError) {
-          throw new Error(`cmp_results: ${resultError.message}`)
+        if (cmpError) {
+          throw new Error(`cmp_results: ${cmpError.message}`)
         }
 
-        const result = ((resultData as ResultRow[] | null) ?? [])[0] ?? null
+        const { data: pmpData, error: pmpError } = await supabase
+          .from('pmp_results')
+          .select('*')
+          .eq('player_id', playerId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+
+        if (pmpError) {
+          throw new Error(`pmp_results: ${pmpError.message}`)
+        }
+
+        const { data: psychoData, error: psychoError } = await supabase
+          .from('psycho_results')
+          .select('*')
+          .eq('player_id', playerId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+
+        if (psychoError) {
+          throw new Error(`psycho_results: ${psychoError.message}`)
+        }
+
+        const cmp = ((cmpData as CmpResultRow[] | null) ?? [])[0] ?? null
+        const pmp = ((pmpData as PmpResultRow[] | null) ?? [])[0] ?? null
+        const psycho = ((psychoData as PsychoResultRow[] | null) ?? [])[0] ?? null
 
         if (!cancelled) {
           setState({
             loading: false,
             error: '',
             player,
-            result
+            cmp,
+            pmp,
+            psycho
           })
         }
       } catch (error: unknown) {
@@ -549,7 +480,9 @@ export default function PlayerPage() {
             loading: false,
             error: getErrorMessage(error),
             player: null,
-            result: null
+            cmp: null,
+            pmp: null,
+            psycho: null
           })
         }
       }
@@ -562,8 +495,10 @@ export default function PlayerPage() {
     }
   }, [playerId])
 
-  const score = useMemo(() => normalizeScore(state.result?.score_global), [state.result])
-  const radar = useMemo(() => extractRadar(state.result), [state.result])
+  const cmpScore = useMemo(() => normalizeScore(state.cmp?.score_global), [state.cmp])
+  const pmpScore = useMemo(() => normalizeScore(state.pmp?.score_global), [state.pmp])
+  const stressLevel = useMemo(() => normalizeScore(state.psycho?.stress_level), [state.psycho])
+  const radar = useMemo(() => extractRadar(state.cmp), [state.cmp])
 
   if (state.loading) {
     return <div style={{ padding: 20 }}>Chargement...</div>
@@ -612,64 +547,88 @@ export default function PlayerPage() {
         </p>
       </section>
 
-      {!state.result ? (
-        <section
-          style={{
-            padding: 24,
-            borderRadius: 20,
-            background: '#ffffff',
-            boxShadow: '0 10px 30px rgba(20,30,60,0.08)'
-          }}
-        >
-          <h2 style={{ marginTop: 0 }}>Joueur trouvé</h2>
-          <p>Aucun résultat CMP pour ce joueur.</p>
-        </section>
-      ) : (
-        <>
-          <section
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-              gap: 18,
-              marginBottom: 24
-            }}
-          >
-            <StatCard value={score !== null ? `${score}/100` : '—'} label="Score global" />
-            <StatCard value={state.result.profile_label || state.result.profile_code || '—'} label="Profil" />
-            <StatCard value={formatDate(state.result.created_at)} label="Date" />
-            <StatCard value={radar ? 'Oui' : 'Non'} label="Radar détaillé" />
-          </section>
+      <section
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: 18,
+          marginBottom: 24
+        }}
+      >
+        <StatCard value={cmpScore !== null ? `${cmpScore}/100` : '—'} label="CMP" />
+        <StatCard value={state.pmp?.profile_label || state.pmp?.profile_code || '—'} label="PMP" />
+        <StatCard value={stressLevel !== null ? `${stressLevel}/100` : '—'} label="Stress psycho" />
+        <StatCard value={formatDate(state.cmp?.created_at || state.pmp?.created_at || state.psycho?.created_at)} label="Dernière mesure" />
+      </section>
 
-          <section
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))',
-              gap: 24,
-              marginBottom: 24
-            }}
-          >
-            <SectionCard title="Dernier résultat CMP">
-              <p><strong>Score global :</strong> {score !== null ? `${score}/100` : '—'}</p>
-              <p><strong>Profil :</strong> {state.result.profile_label || state.result.profile_code || '—'}</p>
-              <p><strong>Date :</strong> {formatDate(state.result.created_at)}</p>
-              <p><strong>Confiance :</strong> {radar ? `${radar.confiance}/100` : '—'}</p>
-              <p><strong>Régulation :</strong> {radar ? `${radar.regulation}/100` : '—'}</p>
-              <p><strong>Engagement :</strong> {radar ? `${radar.engagement}/100` : '—'}</p>
-              <p><strong>Stabilité :</strong> {radar ? `${radar.stabilite}/100` : '—'}</p>
-            </SectionCard>
+      <section
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))',
+          gap: 24,
+          marginBottom: 24
+        }}
+      >
+        {state.cmp ? (
+          <SectionCard title="CMP">
+            <p><strong>Score global :</strong> {cmpScore !== null ? `${cmpScore}/100` : '—'}</p>
+            <p><strong>Profil :</strong> {state.cmp.profile_label || state.cmp.profile_code || '—'}</p>
+            <p><strong>Date :</strong> {formatDate(state.cmp.created_at)}</p>
+            <p><strong>Confiance :</strong> {radar ? `${radar.confiance}/100` : '—'}</p>
+            <p><strong>Régulation :</strong> {radar ? `${radar.regulation}/100` : '—'}</p>
+            <p><strong>Engagement :</strong> {radar ? `${radar.engagement}/100` : '—'}</p>
+            <p><strong>Stabilité :</strong> {radar ? `${radar.stabilite}/100` : '—'}</p>
+          </SectionCard>
+        ) : (
+          <EmptyCard title="CMP" text="Aucun résultat CMP n’est encore enregistré pour ce joueur." />
+        )}
 
-            <SectionCard title="Radar mental">
-              <RadarChart radar={radar} />
-            </SectionCard>
-          </section>
+        <SectionCard title="Radar mental CMP">
+          <RadarChart radar={radar} />
+        </SectionCard>
+      </section>
 
-          <SyntheseA4P
-            profile={state.result?.profile_label ?? state.result?.profile_code ?? ''}
-            score={score}
-            radar={radar}
+      <section
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))',
+          gap: 24,
+          marginBottom: 24
+        }}
+      >
+        {state.pmp ? (
+          <SectionCard title="PMP">
+            <p><strong>Score global :</strong> {pmpScore !== null ? `${pmpScore}/100` : '—'}</p>
+            <p><strong>Profil :</strong> {state.pmp.profile_label || state.pmp.profile_code || '—'}</p>
+            <p><strong>Style de décision :</strong> {state.pmp.decision_style || '—'}</p>
+            <p><strong>Mode de focus :</strong> {state.pmp.focus_mode || '—'}</p>
+            <p><strong>Points forts :</strong> {state.pmp.strengths || '—'}</p>
+            <p><strong>Points de vigilance :</strong> {state.pmp.vigilance_points || '—'}</p>
+            <p><strong>Date :</strong> {formatDate(state.pmp.created_at)}</p>
+          </SectionCard>
+        ) : (
+          <EmptyCard title="PMP" text="Aucun résultat PMP n’est encore enregistré pour ce joueur." />
+        )}
+
+        {state.psycho ? (
+          <SectionCard title="Psycho-émotionnel">
+            <p><strong>Profil :</strong> {state.psycho.profile_label || '—'}</p>
+            <p><strong>Niveau de stress :</strong> {normalizeScore(state.psycho.stress_level) ?? '—'}/100</p>
+            <p><strong>Niveau de confiance :</strong> {normalizeScore(state.psycho.confidence_level) ?? '—'}/100</p>
+            <p><strong>Contrôle émotionnel :</strong> {normalizeScore(state.psycho.emotional_control) ?? '—'}/100</p>
+            <p><strong>Facteur peur :</strong> {normalizeScore(state.psycho.fear_factor) ?? '—'}/100</p>
+            <p><strong>Blocages :</strong> {state.psycho.blockages || '—'}</p>
+            <p><strong>Date :</strong> {formatDate(state.psycho.created_at)}</p>
+          </SectionCard>
+        ) : (
+          <EmptyCard
+            title="Psycho-émotionnel"
+            text="Aucun résultat psycho-émotionnel n’est encore enregistré pour ce joueur."
           />
-        </>
-      )}
+        )}
+      </section>
+
+      <PreSyntheseCroisee cmp={state.cmp} pmp={state.pmp} psycho={state.psycho} />
     </main>
   )
 }
