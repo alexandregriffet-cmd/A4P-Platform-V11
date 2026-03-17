@@ -45,12 +45,21 @@ type PageState = {
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message
-  if (typeof error === 'string') return error
+  if (typeof error === 'string' && error.trim()) return error
+
+  if (error && typeof error === 'object') {
+    const maybeMessage = (error as { message?: unknown }).message
+    if (typeof maybeMessage === 'string' && maybeMessage.trim()) {
+      return maybeMessage
+    }
+  }
+
   return 'Erreur inconnue.'
 }
 
 function formatDate(value?: string | null) {
   if (!value) return '—'
+
   const d = new Date(value)
   if (Number.isNaN(d.getTime())) return '—'
 
@@ -122,7 +131,8 @@ function StatCard({
           fontSize: 34,
           fontWeight: 900,
           color: '#1f3158',
-          marginBottom: 8
+          marginBottom: 8,
+          wordBreak: 'break-word'
         }}
       >
         {value}
@@ -137,7 +147,7 @@ function SectionCard({
   children
 }: {
   title: string
-  children: React.ReactNode
+  children: any
 }) {
   return (
     <div
@@ -275,10 +285,14 @@ function getWeakestDimension(radar: Radar | null) {
 }
 
 function getProfileSummary(profile: string | null | undefined) {
-  const value = (profile || '').toLowerCase()
+  if (!profile || typeof profile !== 'string') {
+    return "Le profil du joueur n’est pas encore défini avec précision. L’analyse reste générale et nécessite des données complémentaires pour être affinée."
+  }
+
+  const value = profile.toLowerCase()
 
   if (value.includes('explorateur')) {
-    return "Le profil explorateur stratégique renvoie à un fonctionnement orienté vers l’adaptation, l’anticipation et la recherche de solutions. Le joueur a tendance à lire vite les situations, à chercher des options et à mobiliser ses ressources lorsqu’il perçoit du sens dans l’action."
+    return "Le profil explorateur stratégique renvoie à un fonctionnement orienté vers l’adaptation, l’anticipation et la recherche de solutions. Le joueur a tendance à lire vite les situations, à s’ajuster en fonction du contexte et à mobiliser ses ressources lorsqu’il perçoit du sens dans l’action."
   }
 
   if (value.includes('leader')) {
@@ -548,6 +562,9 @@ export default function PlayerPage() {
     }
   }, [playerId])
 
+  const score = useMemo(() => normalizeScore(state.result?.score_global), [state.result])
+  const radar = useMemo(() => extractRadar(state.result), [state.result])
+
   if (state.loading) {
     return <div style={{ padding: 20 }}>Chargement...</div>
   }
@@ -571,9 +588,6 @@ export default function PlayerPage() {
       </div>
     )
   }
-
-  const score = normalizeScore(state.result?.score_global)
-  const radar = useMemo(() => extractRadar(state.result), [state.result])
 
   return (
     <main style={{ maxWidth: 1180, margin: '0 auto', padding: 24, background: '#eef2f7' }}>
@@ -650,7 +664,7 @@ export default function PlayerPage() {
           </section>
 
           <SyntheseA4P
-            profile={state.result.profile_label || state.result.profile_code}
+            profile={state.result?.profile_label ?? state.result?.profile_code ?? ''}
             score={score}
             radar={radar}
           />
