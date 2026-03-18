@@ -1,95 +1,80 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-export async function POST(req: NextRequest) {
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+export async function POST(request: NextRequest) {
   try {
-    const body = await req.json()
+    if (!supabaseUrl || !supabaseServiceRoleKey) {
+      return NextResponse.json(
+        { ok: false, message: 'Variables Supabase manquantes.' },
+        { status: 500 }
+      )
+    }
+
+    const body = await request.json().catch(() => null)
     const email = String(body?.email || '').trim().toLowerCase()
     const accessCode = String(body?.accessCode || '').trim()
 
     if (!email || !accessCode) {
       return NextResponse.json(
-        { ok: false, message: 'Email et code d’accès requis.' },
+        { ok: false, message: 'Email et code obligatoires.' },
         { status: 400 }
       )
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey)
 
-    if (!supabaseUrl || !serviceRoleKey) {
+    const { data, error } = await supabase
+      .from('users_individual')
+      .select('*')
+      .eq('email', email)
+      .eq('access_code', accessCode)
+      .eq('has_access', true)
+      .maybeSingle()
+
+    if (error) {
+      console.error('individual-login query error:', error)
       return NextResponse.json(
-        { ok: false, message: 'Configuration Supabase incomplète.' },
+        { ok: false, message: 'Erreur technique de vérification.' },
         { status: 500 }
       )
     }
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey)
-
-    const { data, error } = await supabase
-      .from('individual_access')
-      .select(
-        `
-          id,
-          email,
-          access_code,
-          full_name,
-          access_enabled,
-          pmp_allowed,
-          psycho_allowed,
-          cmp_allowed,
-          pmp_completed,
-          psycho_completed,
-          cmp_completed
-        `
-      )
-      .eq('email', email)
-      .single()
-
-    if (error || !data) {
+    if (!data) {
       return NextResponse.json(
         { ok: false, message: 'Accès introuvable.' },
         { status: 401 }
       )
     }
 
-    if (!data.access_enabled) {
-      return NextResponse.json(
-        { ok: false, message: 'Accès désactivé. Contactez A4P.' },
-        { status: 403 }
-      )
-    }
-
-    if (data.access_code !== accessCode) {
-      return NextResponse.json(
-        { ok: false, message: 'Code d’accès invalide.' },
-        { status: 401 }
-      )
-    }
-
     const response = NextResponse.json({
       ok: true,
-      redirectTo: '/individuel/espace',
+      user: {
+        id: data.id,
+        email: data.email,
+        has_access: data.has_access,
+        pmp_passed: data.pmp_passed,
+        psycho_passed: data.psycho_passed,
+        cmp_passed: data.cmp_passed,
+      },
     })
 
-    response.cookies.set('a4p_individual_email', data.email, {
-      httpOnly: true,
+    response.cookies.set('a4p_individual_session', JSON.stringify({
+      id: data.id,
+      email: data.email,
+    }), {
+      httpOnly: false,
       secure: true,
       sameSite: 'lax',
       path: '/',
-      maxAge: 60 * 60 * 12,
-    })
-
-    response.cookies.set('a4p_individual_code', data.access_code, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 60 * 60 * 12,
+      maxAge: 60 * 60 * 24 * 7,
     })
 
     return response
-  } catch {
+  } catch (error) {
+    console.error('individual-login fatal error:', error)
     return NextResponse.json(
       { ok: false, message: 'Erreur serveur.' },
       { status: 500 }
