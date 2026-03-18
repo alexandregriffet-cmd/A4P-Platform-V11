@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const result = computePmpResults(athlete, answers)
+    const result: any = computePmpResults(athlete, answers)
     const now = new Date().toISOString()
 
     const athleteName =
