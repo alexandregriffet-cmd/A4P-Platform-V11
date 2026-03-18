@@ -29,7 +29,7 @@ export const PMP_DIMENSIONS = {
   regulation: {
     label: 'Régulation',
     description: 'Capacité à gérer ses émotions et sa tension intérieure.',
-    low: 'Peut signaler une sensibilité marquée au stress, à la frustration ou à l’erreur.',
+    low: "Peut signaler une sensibilité marquée au stress, à la frustration ou à l'erreur.",
     high: 'Traduit souvent une stabilité émotionnelle utile dans les moments exigeants.',
   },
   engagement: {
@@ -51,7 +51,7 @@ export const PMP_DIMENSIONS = {
     description:
       "Capacité à rebondir après l'erreur, l'échec ou le contretemps.",
     low: "Peut montrer une tendance à ruminer et à rester bloqué après un passage difficile.",
-    high: 'Traduit une capacité à repartir, apprendre et se reconstruire dans l’action.',
+    high: "Traduit une capacité à repartir, apprendre et se reconstruire dans l'action.",
   },
   cognition: {
     label: 'Cognition',
@@ -62,8 +62,7 @@ export const PMP_DIMENSIONS = {
   },
   motricite: {
     label: 'Motricité',
-    description:
-      'Capacité à ressentir, organiser et ajuster le mouvement.',
+    description: 'Capacité à ressentir, organiser et ajuster le mouvement.',
     low: "Peut signaler peu de repères corporels ou une difficulté à sentir l'ajustement juste.",
     high: 'Traduit un lien fin entre sensation, geste et efficacité.',
   },
@@ -235,12 +234,15 @@ export function computePmpResults(
     }))
     .sort((a, b) => b.value - a.value)
 
-  const learningStyle = [
+  const learningOptions: Array<[string, number]> = [
     ['Analytique', Math.round((scores.cognition + scores.attention) / 2)],
     ['Expérientiel', Math.round((scores.motricite + scores.activation) / 2)],
     ['Compétitif', Math.round((scores.engagement + scores.activation) / 2)],
     ['Méthodique', Math.round((scores.attention + scores.motricite) / 2)],
-  ].sort((a, b) => b[1] - a[1])[0][0]
+  ]
+
+  learningOptions.sort((a, b) => b[1] - a[1])
+  const learningStyle = learningOptions[0][0]
 
   let coherenceIndex = Math.round((scores.motricite + scores.cognition) / 2)
 
