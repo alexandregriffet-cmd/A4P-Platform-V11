@@ -1,19 +1,15 @@
-export type LikertDimension =
-  | 'activation'
-  | 'attention'
-  | 'regulation'
-  | 'engagement'
-  | 'confiance'
-  | 'resilience'
-  | 'cognition'
-  | 'motricite'
-
-export type BinaryAxis = 'ei' | 'sn' | 'tf' | 'jp'
-
 export type PMPLikertQuestion = {
   id: string
   type: 'likert'
-  dimension: LikertDimension
+  dimension:
+    | 'activation'
+    | 'attention'
+    | 'regulation'
+    | 'engagement'
+    | 'confiance'
+    | 'resilience'
+    | 'cognition'
+    | 'motricite'
   label: string
   text: string
   reverse: boolean
@@ -22,7 +18,7 @@ export type PMPLikertQuestion = {
 export type PMPBinaryQuestion = {
   id: string
   type: 'binary'
-  axis: BinaryAxis
+  axis: 'ei' | 'sn' | 'tf' | 'jp'
   text: string
   optionA: string
   optionB: string
@@ -38,7 +34,7 @@ export const PMP_QUESTIONS: PMPQuestion[] = [
   { id: 'Q5', type: 'likert', dimension: 'activation', label: 'Activation', text: "Je me sens stimulé par l'ambiance compétitive.", reverse: false },
   { id: 'Q6', type: 'likert', dimension: 'activation', label: 'Activation', text: "Quand il y a de l'enjeu, je me réveille mentalement.", reverse: false },
   { id: 'Q7', type: 'likert', dimension: 'activation', label: 'Activation', text: "Je manque souvent d'allant au moment où il faut accélérer.", reverse: true },
-  { id: 'Q8', type: 'likert', dimension: 'activation', label: 'Activation', text: "Je sais mobiliser mon énergie quand il faut répondre présent.", reverse: false },
+  { id: 'Q8', type: 'likert', dimension: 'activation', label: 'Activation', text: 'Je sais mobiliser mon énergie quand il faut répondre présent.', reverse: false },
   { id: 'Q9', type: 'likert', dimension: 'activation', label: 'Activation', text: 'Je ressens une dynamique positive quand le défi est élevé.', reverse: false },
   { id: 'Q10', type: 'likert', dimension: 'activation', label: 'Activation', text: "Je subis parfois le rythme au lieu de l'imposer.", reverse: true },
   { id: 'Q11', type: 'likert', dimension: 'activation', label: 'Activation', text: "Je peux élever mon niveau d'activation sans m'éparpiller.", reverse: false },
@@ -50,7 +46,7 @@ export const PMP_QUESTIONS: PMPQuestion[] = [
   { id: 'Q16', type: 'likert', dimension: 'attention', label: 'Attention', text: "Je reste concentré même quand l'environnement est bruyant.", reverse: false },
   { id: 'Q17', type: 'likert', dimension: 'attention', label: 'Attention', text: "Je me laisse facilement distraire pendant l'entraînement ou le match.", reverse: true },
   { id: 'Q18', type: 'likert', dimension: 'attention', label: 'Attention', text: "Je reviens vite à l'instant présent après une erreur.", reverse: false },
-  { id: 'Q19', type: 'likert', dimension: 'attention', label: 'Attention', text: "Mon attention décroche dès que la séance dure longtemps.", reverse: true },
+  { id: 'Q19', type: 'likert', dimension: 'attention', label: 'Attention', text: 'Mon attention décroche dès que la séance dure longtemps.', reverse: true },
   { id: 'Q20', type: 'likert', dimension: 'attention', label: 'Attention', text: 'Je sais me refocaliser sur une consigne importante.', reverse: false },
   { id: 'Q21', type: 'likert', dimension: 'attention', label: 'Attention', text: 'Quand plusieurs choses se passent en même temps, je garde le bon repère.', reverse: false },
   { id: 'Q22', type: 'likert', dimension: 'attention', label: 'Attention', text: 'Je pense trop à autre chose pendant la performance.', reverse: true },
@@ -74,14 +70,14 @@ export const PMP_QUESTIONS: PMPQuestion[] = [
   { id: 'Q39', type: 'likert', dimension: 'regulation', label: 'Régulation', text: 'Je ne me laisse pas dominer trop longtemps par le stress.', reverse: true },
   { id: 'Q40', type: 'likert', dimension: 'regulation', label: 'Régulation', text: "Je monte vite en émotion et j'ai du mal à redescendre.", reverse: false },
   { id: 'Q41', type: 'likert', dimension: 'regulation', label: 'Régulation', text: 'Je peux rester stable après un événement contrarié.', reverse: false },
-  { id: 'Q42', type: 'likert', dimension: 'regulation', label: 'Régulation', text: "Une erreur me fait parfois sortir de mon match émotionnellement.", reverse: true },
+  { id: 'Q42', type: 'likert', dimension: 'regulation', label: 'Régulation', text: 'Une erreur me fait parfois sortir de mon match émotionnellement.', reverse: true },
   { id: 'Q43', type: 'likert', dimension: 'regulation', label: 'Régulation', text: 'Je sais réguler mon niveau de tension intérieure.', reverse: false },
   { id: 'Q44', type: 'likert', dimension: 'regulation', label: 'Régulation', text: 'Je me crispe facilement quand je veux trop bien faire.', reverse: true },
   { id: 'Q45', type: 'likert', dimension: 'regulation', label: 'Régulation', text: 'Je retrouve mon axe émotionnel après un moment difficile.', reverse: true },
 
   { id: 'Q46', type: 'likert', dimension: 'engagement', label: 'Engagement', text: "Je m'implique pleinement dans ce que j'ai à faire.", reverse: false },
   { id: 'Q47', type: 'likert', dimension: 'engagement', label: 'Engagement', text: "Quand c'est difficile, j'ai parfois tendance à lâcher intérieurement.", reverse: true },
-  { id: 'Q48', type: 'likert', dimension: 'engagement', label: 'Engagement', text: 'Je fournis mes efforts même quand je ne suis pas en réussite.', reverse: false },
+  { id: 'Q48', type: 'likert', dimension: 'engagement', label: 'Engagement', text: "Je fournis mes efforts même quand je ne suis pas en réussite.", reverse: false },
   { id: 'Q49', type: 'likert', dimension: 'engagement', label: 'Engagement', text: "Je reste investi jusqu'au bout de la séance ou du match.", reverse: false },
   { id: 'Q50', type: 'likert', dimension: 'engagement', label: 'Engagement', text: "Mon niveau d'engagement dépend trop de mon humeur du moment.", reverse: true },
   { id: 'Q51', type: 'likert', dimension: 'engagement', label: 'Engagement', text: "Je vais au contact du défi plutôt que de l'éviter.", reverse: false },
@@ -111,7 +107,7 @@ export const PMP_QUESTIONS: PMPQuestion[] = [
   { id: 'Q74', type: 'likert', dimension: 'confiance', label: 'Confiance', text: 'Je laisse facilement un détail négatif éteindre ma confiance.', reverse: true },
   { id: 'Q75', type: 'likert', dimension: 'confiance', label: 'Confiance', text: 'Je crois en ma marge de progression.', reverse: false },
 
-  { id: 'Q76', type: 'likert', dimension: 'resilience', label: 'Résilience', text: "Je rebondis assez vite après un échec ou une erreur.", reverse: false },
+  { id: 'Q76', type: 'likert', dimension: 'resilience', label: 'Résilience', text: 'Je rebondis assez vite après un échec ou une erreur.', reverse: false },
   { id: 'Q77', type: 'likert', dimension: 'resilience', label: 'Résilience', text: 'Je rumine longtemps quand quelque chose se passe mal.', reverse: true },
   { id: 'Q78', type: 'likert', dimension: 'resilience', label: 'Résilience', text: 'Je sais repartir après un moment compliqué.', reverse: false },
   { id: 'Q79', type: 'likert', dimension: 'resilience', label: 'Résilience', text: 'Un mauvais passage peut me faire sortir durablement de ma performance.', reverse: true },
@@ -130,7 +126,7 @@ export const PMP_QUESTIONS: PMPQuestion[] = [
   { id: 'Q91', type: 'likert', dimension: 'cognition', label: 'Cognition', text: "J'aime comprendre en profondeur ce qu'il faut faire pour progresser.", reverse: false },
   { id: 'Q92', type: 'likert', dimension: 'cognition', label: 'Cognition', text: 'Je préfère agir sans trop analyser ce que je fais.', reverse: true },
   { id: 'Q93', type: 'likert', dimension: 'cognition', label: 'Cognition', text: "Je repère assez vite les logiques d'une situation de jeu.", reverse: false },
-  { id: 'Q94', type: 'likert', dimension: 'cognition', label: 'Cognition', text: "Je comprends bien les liens entre stratégie, intention et exécution.", reverse: false },
+  { id: 'Q94', type: 'likert', dimension: 'cognition', label: 'Cognition', text: 'Je comprends bien les liens entre stratégie, intention et exécution.', reverse: false },
   { id: 'Q95', type: 'likert', dimension: 'cognition', label: 'Cognition', text: 'Je prends parfois des décisions sans vraiment lire ce qui se passe.', reverse: false },
   { id: 'Q96', type: 'likert', dimension: 'cognition', label: 'Cognition', text: "J'aime anticiper plusieurs options avant d'agir.", reverse: false },
   { id: 'Q97', type: 'likert', dimension: 'cognition', label: 'Cognition', text: 'Je vois facilement comment adapter mon comportement à la situation.', reverse: false },
@@ -144,7 +140,7 @@ export const PMP_QUESTIONS: PMPQuestion[] = [
   { id: 'Q105', type: 'likert', dimension: 'cognition', label: 'Cognition', text: 'Je développe de la clarté quand je prends du recul.', reverse: false },
 
   { id: 'Q106', type: 'likert', dimension: 'motricite', label: 'Motricité', text: "Je ressens facilement comment mon corps s'organise dans le mouvement.", reverse: false },
-  { id: 'Q107', type: 'likert', dimension: 'motricite', label: 'Motricité', text: 'Je manque parfois de repères corporels pendant l\'action.', reverse: true },
+  { id: 'Q107', type: 'likert', dimension: 'motricite', label: 'Motricité', text: "Je manque parfois de repères corporels pendant l'action.", reverse: true },
   { id: 'Q108', type: 'likert', dimension: 'motricite', label: 'Motricité', text: 'Je perçois assez vite si mon geste est juste ou non.', reverse: false },
   { id: 'Q109', type: 'likert', dimension: 'motricite', label: 'Motricité', text: "Je comprends mieux quand on me montre et que je ressens l'action.", reverse: false },
   { id: 'Q110', type: 'likert', dimension: 'motricite', label: 'Motricité', text: 'Je me sens parfois coupé de mes sensations dans le mouvement.', reverse: true },
@@ -163,15 +159,18 @@ export const PMP_QUESTIONS: PMPQuestion[] = [
   { id: 'Q122', type: 'binary', axis: 'ei', text: "Choisis l'affirmation qui te ressemble le plus.", optionA: 'Dans un groupe, je prends facilement la parole.', optionB: 'Dans un groupe, je préfère observer avant de parler.' },
   { id: 'Q123', type: 'binary', axis: 'ei', text: "Choisis l'affirmation qui te ressemble le plus.", optionA: "L'énergie collective me stimule pendant la compétition.", optionB: 'Je performe mieux quand je reste dans ma bulle.' },
   { id: 'Q124', type: 'binary', axis: 'ei', text: "Choisis l'affirmation qui te ressemble le plus.", optionA: "Avant un match, j'aime être au contact de l'ambiance.", optionB: "Avant un match, j'aime préserver mon espace intérieur." },
+
   { id: 'Q125', type: 'binary', axis: 'sn', text: "Choisis l'affirmation qui te ressemble le plus.", optionA: "Je fais confiance à ce que j'observe concrètement.", optionB: 'Je repère vite les possibilités cachées derrière la situation.' },
   { id: 'Q126', type: 'binary', axis: 'sn', text: "Choisis l'affirmation qui te ressemble le plus.", optionA: "J'apprends mieux à partir d'exemples précis.", optionB: "J'apprends mieux à partir d'idées et de liens globaux." },
   { id: 'Q127', type: 'binary', axis: 'sn', text: "Choisis l'affirmation qui te ressemble le plus.", optionA: 'Je préfère des consignes claires et concrètes.', optionB: "Je préfère comprendre l'intention générale pour adapter ensuite." },
   { id: 'Q128', type: 'binary', axis: 'sn', text: "Choisis l'affirmation qui te ressemble le plus.", optionA: "Je m'appuie d'abord sur les faits du moment.", optionB: "Je m'appuie d'abord sur ce qui pourrait arriver ensuite." },
-  { id: 'Q129', type: 'binary', axis: 'tf', text: "Choisis l'affirmation qui te ressemble le plus.", optionA: 'Je décide d’abord selon ce qui me semble logique et efficace.', optionB: "Je décide d'abord en tenant compte des personnes et du ressenti." },
+
+  { id: 'Q129', type: 'binary', axis: 'tf', text: "Choisis l'affirmation qui te ressemble le plus.", optionA: "Je décide d'abord selon ce qui me semble logique et efficace.", optionB: "Je décide d'abord en tenant compte des personnes et du ressenti." },
   { id: 'Q130', type: 'binary', axis: 'tf', text: "Choisis l'affirmation qui te ressemble le plus.", optionA: 'Pour progresser, je préfère un retour direct et objectif.', optionB: 'Pour progresser, je préfère un retour nuancé et humain.' },
   { id: 'Q131', type: 'binary', axis: 'tf', text: "Choisis l'affirmation qui te ressemble le plus.", optionA: 'En situation difficile, je tranche assez rationnellement.', optionB: "En situation difficile, j'accorde beaucoup de place au ressenti." },
-  { id: 'Q132', type: 'binary', axis: 'tf', text: "Choisis l'affirmation qui te ressemble le plus.", optionA: 'Je me sens à l’aise avec une évaluation franche.', optionB: 'Je me sens à l’aise avec une évaluation formulée avec tact.' },
-  { id: 'Q133', type: 'binary', axis: 'jp', text: "Choisis l'affirmation qui te ressemble le plus.", optionA: "Je préfère préparer les choses à l'avance et structurer mon cadre.", optionB: "Je préfère garder de la souplesse et m'adapter au fil de la situation." },
+  { id: 'Q132', type: 'binary', axis: 'tf', text: "Choisis l'affirmation qui te ressemble le plus.", optionA: "Je me sens à l'aise avec une évaluation franche.", optionB: "Je me sens à l'aise avec une évaluation formulée avec tact." },
+
+  { id: 'Q133', type: 'binary', axis: 'jp', text: "Choisis l'affirmation qui te ressemble le plus.", optionA: "Je préfère préparer les choses à l'avance et structurer mon cadre.", optionB: 'Je préfère garder de la souplesse et m’adapter au fil de la situation.' },
   { id: 'Q134', type: 'binary', axis: 'jp', text: "Choisis l'affirmation qui te ressemble le plus.", optionA: "Je suis rassuré quand l'organisation est claire.", optionB: "Je suis plus à l'aise quand il reste de la liberté." },
   { id: 'Q135', type: 'binary', axis: 'jp', text: "Choisis l'affirmation qui te ressemble le plus.", optionA: "J'aime fermer les sujets et savoir où je vais.", optionB: "J'aime laisser plusieurs options ouvertes." },
   { id: 'Q136', type: 'binary', axis: 'jp', text: "Choisis l'affirmation qui te ressemble le plus.", optionA: 'Je préfère des routines stables.', optionB: 'Je préfère une organisation vivante qui peut bouger.' },
