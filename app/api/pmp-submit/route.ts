@@ -1,124 +1,120 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { computePMPResults } from '@/lib/pmp/scoring'
+import { computePmpResults } from '@/lib/pmp/scoring'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 export async function POST(req: NextRequest) {
   try {
-    const cookieEmail = req.cookies.get('a4p_individual_email')?.value || ''
-    const cookieCode = req.cookies.get('a4p_individual_code')?.value || ''
+    if (!supabaseUrl || !serviceRoleKey) {
+      return NextResponse.json(
+        { ok: false, message: 'Variables Supabase manquantes.' },
+        { status: 500 }
+      )
+    }
 
-    if (!cookieEmail || !cookieCode) {
+    const body = await req.json().catch(() => null)
+
+    const userId = String(body?.userId || '').trim()
+    const email = String(body?.email || '').trim().toLowerCase()
+    const athlete = body?.athlete || {}
+    const answers = body?.answers || {}
+
+    if (!userId || !email) {
       return NextResponse.json(
         { ok: false, message: 'Session individuelle introuvable.' },
         { status: 401 }
       )
     }
 
-    const body = await req.json()
-    const answers = body?.answers || {}
-    const athlete = body?.athlete || {}
+    const supabase = createClient(supabaseUrl, serviceRoleKey)
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    const { data: user, error: userError } = await supabase
+      .from('users_individual')
+      .select('*')
+      .eq('id', userId)
+      .eq('email', email)
+      .eq('has_access', true)
+      .maybeSingle()
 
-    if (!supabaseUrl || !serviceRoleKey) {
+    if (userError) {
       return NextResponse.json(
-        { ok: false, message: 'Configuration Supabase incomplète.' },
+        { ok: false, message: 'Erreur technique de vérification.' },
         { status: 500 }
       )
     }
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey)
-
-    const { data: access, error: accessError } = await supabase
-      .from('individual_access')
-      .select('*')
-      .eq('email', cookieEmail)
-      .eq('access_code', cookieCode)
-      .single()
-
-    if (accessError || !access) {
+    if (!user) {
       return NextResponse.json(
-        { ok: false, message: 'Accès individuel invalide.' },
-        { status: 401 }
+        { ok: false, message: 'Accès individuel introuvable.' },
+        { status: 404 }
       )
     }
 
-    if (!access.access_enabled) {
+    if (user.pmp_passed) {
       return NextResponse.json(
-        { ok: false, message: 'Accès désactivé.' },
-        { status: 403 }
-      )
-    }
-
-    if (!access.pmp_allowed) {
-      return NextResponse.json(
-        { ok: false, message: 'PMP non autorisé pour ce compte.' },
-        { status: 403 }
-      )
-    }
-
-    if (access.pmp_completed) {
-      return NextResponse.json(
-        { ok: false, message: 'Le PMP a déjà été réalisé.' },
+        { ok: false, message: 'Le PMP a déjà été validé pour ce compte.' },
         { status: 409 }
       )
     }
 
-    const result = computePMPResults(answers)
+    const result = computePmpResults(athlete, answers)
 
-    const { error: insertError } = await supabase.from('pmp_results').upsert(
-      {
-        email: cookieEmail,
-        athlete_name: athlete.name || access.full_name || '',
-        athlete_age: athlete.age ? Number(athlete.age) : null,
-        athlete_sport: athlete.sport || '',
-        athlete_club: athlete.club || '',
-        answers,
-        scores: result.scores,
-        mbti_type: result.mbtiType,
-        motor: result.motor,
-        motor_family: result.motorFamily,
-        global_index: result.globalIndex,
-        pressure_index: result.pressureIndex,
-        stability_index: result.stabilityIndex,
-        learning_style: result.learningStyle,
-        coherence_index: result.coherenceIndex,
-        profiles: result.profiles,
-        high_dims: result.highDims,
-        low_dims: result.lowDims,
-        global_band: result.globalBand,
-      },
-      { onConflict: 'email' }
-    )
+    const { error: resultError } = await supabase
+      .from('pmp_results')
+      .upsert(
+        {
+          user_id: user.id,
+          email: user.email,
+          athlete_name: result.athlete.name,
+          athlete_age: result.athlete.age,
+          athlete_sport: result.athlete.sport,
+          athlete_club: result.athlete.club,
+          result_json: result,
+          answers_json: answers,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id' }
+      )
 
-    if (insertError) {
+    if (resultError) {
       return NextResponse.json(
-        { ok: false, message: insertError.message },
+        { ok: false, message: 'Impossible de sauvegarder le résultat PMP.' },
         { status: 500 }
       )
     }
 
-    const { error: updateError } = await supabase
-      .from('individual_access')
-      .update({ pmp_completed: true })
-      .eq('email', cookieEmail)
-      .eq('access_code', cookieCode)
+    const { data: updatedUser, error: updateError } = await supabase
+      .from('users_individual')
+      .update({ pmp_passed: true })
+      .eq('id', user.id)
+      .select('*')
+      .single()
 
     if (updateError) {
       return NextResponse.json(
-        { ok: false, message: updateError.message },
+        { ok: false, message: 'Impossible de verrouiller le PMP.' },
         { status: 500 }
       )
     }
 
     return NextResponse.json({
       ok: true,
-      redirectTo: '/individuel/pmp/resultat',
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        has_access: updatedUser.has_access,
+        pmp_passed: updatedUser.pmp_passed,
+        psycho_passed: updatedUser.psycho_passed,
+        cmp_passed: updatedUser.cmp_passed,
+      },
+      result,
     })
-  } catch {
+  } catch (error) {
+    console.error('pmp-submit fatal error:', error)
     return NextResponse.json(
-      { ok: false, message: 'Erreur serveur PMP.' },
+      { ok: false, message: 'Erreur serveur.' },
       { status: 500 }
     )
   }
