@@ -18,10 +18,8 @@ export default function IndividualPmpPage() {
 
   const [user, setUser] = useState<IndividualUser | null>(null)
   const [checking, setChecking] = useState(true)
-  const [loadingComplete, setLoadingComplete] = useState(false)
   const [error, setError] = useState('')
   const [accessDenied, setAccessDenied] = useState(false)
-  const [pmpUrl, setPmpUrl] = useState('')
 
   useEffect(() => {
     const init = async () => {
@@ -65,7 +63,6 @@ export default function IndividualPmpPage() {
           return
         }
 
-        setPmpUrl(result.pmpUrl || '')
         setChecking(false)
       } catch (err) {
         console.error(err)
@@ -77,42 +74,6 @@ export default function IndividualPmpPage() {
 
     init()
   }, [router])
-
-  async function handleCompletePmp() {
-    if (!user) return
-
-    setLoadingComplete(true)
-    setError('')
-
-    try {
-      const response = await fetch('/api/individual-pmp-complete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          email: user.email,
-        }),
-      })
-
-      const result = await response.json()
-
-      if (!response.ok || !result?.ok) {
-        setError(result?.message || 'Impossible de valider la fin du PMP.')
-        setLoadingComplete(false)
-        return
-      }
-
-      if (result?.user) {
-        localStorage.setItem('a4p_individual_user', JSON.stringify(result.user))
-      }
-
-      router.push('/individuel/dashboard')
-    } catch (err) {
-      console.error(err)
-      setError('Erreur technique. Merci de réessayer.')
-      setLoadingComplete(false)
-    }
-  }
 
   if (checking) {
     return (
@@ -273,8 +234,9 @@ export default function IndividualPmpPage() {
               opacity: 0.96,
             }}
           >
-            Bonjour {user?.email}. Votre accès PMP est ouvert pour une passation contrôlée.
-            Une fois le test terminé et validé, ce compte sera verrouillé pour le PMP.
+            Bonjour {user?.email}. Votre accès PMP est bien contrôlé dans la plateforme.
+            Pour éviter toute fuite de lien public, le PMP externe GitHub n’est plus ouvert
+            depuis cet espace.
           </p>
         </section>
 
@@ -302,7 +264,7 @@ export default function IndividualPmpPage() {
                 color: '#22366c',
               }}
             >
-              Règle d’accès PMP
+              Pourquoi nous bloquons l’ouverture externe
             </h2>
 
             <ul
@@ -314,68 +276,10 @@ export default function IndividualPmpPage() {
                 lineHeight: 1.9,
               }}
             >
-              <li>Un seul passage autorisé pour ce compte</li>
-              <li>Validation finale à effectuer uniquement après la vraie complétion du PMP</li>
-              <li>Le dashboard sera mis à jour automatiquement après validation</li>
+              <li>Un lien GitHub public peut être copié et réutilisé hors plateforme</li>
+              <li>Ce fonctionnement contourne le verrou “un seul passage”</li>
+              <li>La vraie solution propre est l’intégration du PMP dans le SaaS</li>
             </ul>
-          </div>
-
-          <div
-            style={{
-              background: '#ffffff',
-              borderRadius: 28,
-              padding: 26,
-              boxShadow: '0 16px 40px rgba(31, 41, 55, 0.08)',
-              border: '1px solid #e7edf7',
-            }}
-          >
-            <div
-              style={{
-                display: 'grid',
-                gap: 14,
-                marginBottom: 18,
-              }}
-            >
-              <a
-                href={pmpUrl}
-                target="_blank"
-                rel="noreferrer"
-                style={primaryButtonStyle}
-              >
-                Ouvrir le PMP
-              </a>
-
-              <button
-                type="button"
-                onClick={handleCompletePmp}
-                disabled={loadingComplete}
-                style={{
-                  ...secondaryButtonStyleAsButton,
-                  opacity: loadingComplete ? 0.7 : 1,
-                }}
-              >
-                {loadingComplete
-                  ? 'Validation en cours...'
-                  : 'J’ai terminé mon PMP et je valide ce passage'}
-              </button>
-            </div>
-
-            {error ? (
-              <div
-                style={{
-                  borderRadius: 22,
-                  background: '#fdeeee',
-                  border: '2px solid #efc4c4',
-                  color: '#a13328',
-                  fontSize: 18,
-                  fontWeight: 800,
-                  padding: '18px 20px',
-                  marginTop: 10,
-                }}
-              >
-                {error}
-              </div>
-            ) : null}
           </div>
 
           <div
@@ -390,46 +294,43 @@ export default function IndividualPmpPage() {
             <h2
               style={{
                 margin: 0,
-                fontSize: 28,
+                fontSize: 30,
                 fontWeight: 900,
                 color: '#22366c',
               }}
             >
-              Aperçu intégré
+              Intégration sécurisée en cours
             </h2>
 
             <p
               style={{
-                margin: '16px 0 18px',
+                margin: '18px 0 0',
                 color: '#5d6b8a',
-                fontSize: 19,
-                lineHeight: 1.7,
+                fontSize: 21,
+                lineHeight: 1.75,
               }}
             >
-              Vous pouvez ouvrir le test en plein écran via le bouton ci-dessus. L’aperçu
-              ci-dessous reste pratique sur ordinateur, mais sur mobile l’ouverture externe
-              est souvent plus confortable.
+              Le PMP va maintenant être injecté directement dans votre plateforme A4P.
+              À partir de cette étape, il ne sera plus lancé via un hub GitHub public,
+              mais depuis un parcours individuel sécurisé, contrôlé et relié à vos droits d’accès.
             </p>
 
-            <div
-              style={{
-                borderRadius: 24,
-                overflow: 'hidden',
-                border: '1px solid #dbe3f0',
-                background: '#f8faff',
-                minHeight: 680,
-              }}
-            >
-              <iframe
-                title="PMP A4P"
-                src={pmpUrl}
+            <div style={{ display: 'grid', gap: 14, marginTop: 24 }}>
+              <button
+                type="button"
+                disabled
                 style={{
-                  width: '100%',
-                  height: 680,
-                  border: 'none',
-                  background: '#ffffff',
+                  ...primaryButtonStyleAsButton,
+                  opacity: 0.45,
+                  cursor: 'not-allowed',
                 }}
-              />
+              >
+                PMP externe désactivé
+              </button>
+
+              <Link href="/individuel/dashboard" style={secondaryButtonStyle}>
+                Retour au tableau de bord
+              </Link>
             </div>
           </div>
 
@@ -484,17 +385,16 @@ const secondaryButtonStyle: React.CSSProperties = {
   textDecoration: 'none',
 }
 
-const secondaryButtonStyleAsButton: React.CSSProperties = {
+const primaryButtonStyleAsButton: React.CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
   width: '100%',
   minHeight: 72,
   borderRadius: 22,
-  border: '2px solid #dbe3f0',
-  background: '#f8faff',
-  color: '#22366c',
-  fontSize: 20,
+  border: 'none',
+  background: '#21366f',
+  color: '#ffffff',
+  fontSize: 22,
   fontWeight: 900,
-  cursor: 'pointer',
 }
