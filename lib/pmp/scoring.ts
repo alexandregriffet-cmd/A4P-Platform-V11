@@ -1,7 +1,5 @@
 import { MBTI_TO_MOTOR, MOTOR_FAMILIES, PMP_DIMENSIONS, PMP_PROFILES } from './config'
-import { PMP_QUESTIONS } from './questions'
-
-export type PMPAnswers = Record<string, number | 'A' | 'B'>
+import { PMP_QUESTIONS, type PMPAnswers, type PMPQuestion } from './questions'
 
 export type PMPResult = {
   scores: Record<string, number>
@@ -19,13 +17,24 @@ export type PMPResult = {
   globalBand: string
 }
 
+type PMPLikertQuestion = Extract<PMPQuestion, { type: 'likert' }>
+type PMPBinaryQuestion = Extract<PMPQuestion, { type: 'binary' }>
+
+function isLikertQuestion(question: PMPQuestion): question is PMPLikertQuestion {
+  return question.type === 'likert'
+}
+
+function isBinaryQuestion(question: PMPQuestion): question is PMPBinaryQuestion {
+  return question.type === 'binary'
+}
+
 export function computePMPResults(answers: PMPAnswers): PMPResult {
   const scores: Record<string, number> = {}
   const dims = Object.keys(PMP_DIMENSIONS)
 
   dims.forEach((key) => {
     const items = PMP_QUESTIONS.filter(
-      (q) => q.type === 'likert' && q.dimension === key
+      (q): q is PMPLikertQuestion => isLikertQuestion(q) && q.dimension === key
     )
 
     const total = items.reduce((sum, q) => {
@@ -39,7 +48,7 @@ export function computePMPResults(answers: PMPAnswers): PMPResult {
 
   const axisScores = { ei: 0, sn: 0, tf: 0, jp: 0 }
 
-  PMP_QUESTIONS.filter((q) => q.type === 'binary').forEach((q) => {
+  PMP_QUESTIONS.filter(isBinaryQuestion).forEach((q) => {
     const ans = answers[q.id]
     if (ans === 'A') axisScores[q.axis] += 1
     if (ans === 'B') axisScores[q.axis] -= 1
