@@ -1,17 +1,46 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 export default function ConnexionIndividuellePage() {
+  const router = useRouter()
+
   const [email, setEmail] = useState('')
   const [accessCode, setAccessCode] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    alert(
-      "Écran de connexion prêt. La validation réelle de l'accès sera branchée à l'étape suivante."
-    )
+    setErrorMessage('')
+    setLoading(true)
+
+    try {
+      const res = await fetch('/api/individual-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          accessCode,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok || !data.ok) {
+        setErrorMessage(data?.message || 'Connexion impossible.')
+        setLoading(false)
+        return
+      }
+
+      router.push(data.redirectTo || '/individuel/espace')
+      router.refresh()
+    } catch {
+      setErrorMessage('Connexion impossible pour le moment.')
+      setLoading(false)
+    }
   }
 
   return (
@@ -82,26 +111,9 @@ export default function ConnexionIndividuellePage() {
               color: 'rgba(255,255,255,0.92)',
             }}
           >
-            Identifiez-vous pour accéder à votre parcours personnel, à vos tests
-            autorisés et à vos résultats.
+            Identifiez-vous pour accéder à votre parcours personnel et à vos
+            tests autorisés.
           </p>
-
-          <div
-            style={{
-              marginTop: 16,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '10px 14px',
-              borderRadius: 999,
-              background: 'rgba(255,255,255,0.12)',
-              border: '1px solid rgba(255,255,255,0.18)',
-              fontSize: 13,
-              fontWeight: 700,
-            }}
-          >
-            🔒 Données confidentielles • Accès contrôlé
-          </div>
         </section>
 
         <section
@@ -150,6 +162,7 @@ export default function ConnexionIndividuellePage() {
                   boxSizing: 'border-box',
                   outline: 'none',
                 }}
+                required
               />
             </div>
 
@@ -182,71 +195,48 @@ export default function ConnexionIndividuellePage() {
                   boxSizing: 'border-box',
                   outline: 'none',
                 }}
+                required
               />
             </div>
 
+            {errorMessage ? (
+              <div
+                style={{
+                  background: '#fff2f2',
+                  color: '#b42318',
+                  border: '1px solid #f1c0c0',
+                  borderRadius: 14,
+                  padding: '14px 16px',
+                  fontSize: 15,
+                  fontWeight: 700,
+                }}
+              >
+                {errorMessage}
+              </div>
+            ) : null}
+
             <button
               type="submit"
+              disabled={loading}
               style={{
                 marginTop: 4,
-                background: '#1f3158',
+                background: loading ? '#8a96b3' : '#1f3158',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: 14,
                 padding: '16px 20px',
                 fontWeight: 800,
                 fontSize: 17,
-                cursor: 'pointer',
+                cursor: loading ? 'not-allowed' : 'pointer',
                 boxShadow: '0 12px 28px rgba(31,49,88,0.16)',
               }}
             >
-              Valider mon accès →
+              {loading ? 'Vérification en cours...' : 'Valider mon accès →'}
             </button>
           </form>
         </section>
 
-        <section
-          style={{
-            background: '#ffffff',
-            borderRadius: 24,
-            padding: 22,
-            boxShadow: '0 12px 32px rgba(31,49,88,0.08)',
-            border: '1px solid #e3eaf5',
-            marginBottom: 18,
-          }}
-        >
-          <h2
-            style={{
-              margin: '0 0 12px 0',
-              fontSize: 24,
-              fontWeight: 900,
-              color: '#1f3158',
-            }}
-          >
-            Rappel des règles d’accès
-          </h2>
-
-          <ul
-            style={{
-              margin: 0,
-              paddingLeft: 20,
-              fontSize: 16,
-              lineHeight: 1.9,
-              color: '#5d6d89',
-            }}
-          >
-            <li>Un seul passage autorisé par test</li>
-            <li>Nouvelle passation uniquement sur autorisation A4P</li>
-            <li>Accès étendu possible dans le cadre d’un abonnement</li>
-            <li>Les résultats sont personnels et confidentiels</li>
-          </ul>
-        </section>
-
-        <div
-          style={{
-            textAlign: 'center',
-          }}
-        >
+        <div style={{ textAlign: 'center' }}>
           <Link
             href="/individuel"
             style={{
