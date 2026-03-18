@@ -1,5 +1,7 @@
 import { MBTI_TO_MOTOR, MOTOR_FAMILIES, PMP_DIMENSIONS, PMP_PROFILES } from './config'
-import { PMP_QUESTIONS, type PMPAnswers, type PMPQuestion } from './questions'
+import { PMP_QUESTIONS, type PMPQuestion } from './questions'
+
+export type PMPAnswers = Record<string, number | 'A' | 'B'>
 
 export type PMPResult = {
   scores: Record<string, number>
