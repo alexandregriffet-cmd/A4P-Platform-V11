@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 
 export default async function EspaceIndividuelPage() {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const email = cookieStore.get('a4p_individual_email')?.value || ''
   const accessCode = cookieStore.get('a4p_individual_code')?.value || ''
 
@@ -56,7 +56,10 @@ export default async function EspaceIndividuelPage() {
     border: '1px solid #e3eaf5',
   }
 
-  const statusStyle = (completed: boolean, allowed: boolean): React.CSSProperties => ({
+  const badgeStyle = (
+    completed: boolean,
+    allowed: boolean
+  ): React.CSSProperties => ({
     display: 'inline-block',
     padding: '8px 12px',
     borderRadius: 999,
@@ -64,6 +67,7 @@ export default async function EspaceIndividuelPage() {
     fontWeight: 800,
     background: completed ? '#e8f7ee' : allowed ? '#eef3fb' : '#fff4e5',
     color: completed ? '#137333' : allowed ? '#1f3158' : '#9a6700',
+    marginBottom: 12,
   })
 
   return (
@@ -127,54 +131,71 @@ export default async function EspaceIndividuelPage() {
               color: 'rgba(255,255,255,0.92)',
             }}
           >
-            Votre accès a été validé. La plateforme vérifie ici vos droits de
-            passation et l’état de vos tests.
+            Votre accès a été validé. Retrouvez ici vos tests autorisés et vos
+            résultats.
           </p>
         </section>
 
         <section style={{ display: 'grid', gap: 18 }}>
           <article style={testCardStyle}>
-            <h2 style={{ marginTop: 0, fontSize: 28, fontWeight: 900 }}>PMP</h2>
-            <p style={{ color: '#5d6d89', fontSize: 16, lineHeight: 1.7 }}>
-              Profil mental de performance.
-            </p>
-            <div style={statusStyle(data.pmp_completed, data.pmp_allowed)}>
+            <div style={badgeStyle(data.pmp_completed, data.pmp_allowed)}>
               {data.pmp_completed
                 ? 'Déjà réalisé'
                 : data.pmp_allowed
                 ? 'Autorisé'
                 : 'Non autorisé'}
             </div>
+
+            <h2 style={{ marginTop: 0, fontSize: 28, fontWeight: 900 }}>PMP</h2>
+            <p style={{ color: '#5d6d89', fontSize: 16, lineHeight: 1.7 }}>
+              Profil mental de performance.
+            </p>
+
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 14 }}>
+              {!data.pmp_completed && data.pmp_allowed ? (
+                <Link href="/individuel/pmp" style={primaryLinkStyle}>
+                  Passer le PMP
+                </Link>
+              ) : null}
+
+              {data.pmp_completed ? (
+                <Link href="/individuel/pmp/resultat" style={secondaryLinkStyle}>
+                  Voir ma synthèse PMP
+                </Link>
+              ) : null}
+            </div>
           </article>
 
           <article style={testCardStyle}>
-            <h2 style={{ marginTop: 0, fontSize: 28, fontWeight: 900 }}>
-              Psycho-émotionnel
-            </h2>
-            <p style={{ color: '#5d6d89', fontSize: 16, lineHeight: 1.7 }}>
-              Lecture émotionnelle sous pression.
-            </p>
-            <div style={statusStyle(data.psycho_completed, data.psycho_allowed)}>
+            <div style={badgeStyle(data.psycho_completed, data.psycho_allowed)}>
               {data.psycho_completed
                 ? 'Déjà réalisé'
                 : data.psycho_allowed
                 ? 'Autorisé'
                 : 'Non autorisé'}
             </div>
+
+            <h2 style={{ marginTop: 0, fontSize: 28, fontWeight: 900 }}>
+              Psycho-émotionnel
+            </h2>
+            <p style={{ color: '#5d6d89', fontSize: 16, lineHeight: 1.7 }}>
+              Lecture émotionnelle sous pression.
+            </p>
           </article>
 
           <article style={testCardStyle}>
-            <h2 style={{ marginTop: 0, fontSize: 28, fontWeight: 900 }}>CMP</h2>
-            <p style={{ color: '#5d6d89', fontSize: 16, lineHeight: 1.7 }}>
-              Compétences mentales de performance.
-            </p>
-            <div style={statusStyle(data.cmp_completed, data.cmp_allowed)}>
+            <div style={badgeStyle(data.cmp_completed, data.cmp_allowed)}>
               {data.cmp_completed
                 ? 'Déjà réalisé'
                 : data.cmp_allowed
                 ? 'Autorisé'
                 : 'Non autorisé'}
             </div>
+
+            <h2 style={{ marginTop: 0, fontSize: 28, fontWeight: 900 }}>CMP</h2>
+            <p style={{ color: '#5d6d89', fontSize: 16, lineHeight: 1.7 }}>
+              Compétences mentales de performance.
+            </p>
           </article>
         </section>
 
@@ -194,4 +215,23 @@ export default async function EspaceIndividuelPage() {
       </div>
     </main>
   )
+}
+
+const primaryLinkStyle: React.CSSProperties = {
+  textDecoration: 'none',
+  background: '#1f3158',
+  color: '#ffffff',
+  borderRadius: 14,
+  padding: '14px 18px',
+  fontWeight: 800,
+}
+
+const secondaryLinkStyle: React.CSSProperties = {
+  textDecoration: 'none',
+  background: '#ffffff',
+  color: '#1f3158',
+  borderRadius: 14,
+  padding: '14px 18px',
+  fontWeight: 800,
+  border: '1px solid #d7e1f0',
 }
