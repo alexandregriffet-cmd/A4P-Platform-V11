@@ -82,8 +82,6 @@ export async function POST(request: NextRequest) {
         psycho_passed: data.psycho_passed,
         cmp_passed: data.cmp_passed,
       },
-      pmpUrl:
-        'https://alexandregriffet-cmd.github.io/PMP-A4P-Acad-mie-de-Performances-/',
     })
   } catch (error) {
     console.error('individual-pmp-access fatal error:', error)
