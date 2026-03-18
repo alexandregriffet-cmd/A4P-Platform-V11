@@ -1,42 +1,107 @@
-import { MBTI_TO_MOTOR, MOTOR_FAMILIES, PMP_DIMENSIONS, PMP_PROFILES } from './config'
-import { PMP_QUESTIONS, type PMPQuestion } from './questions'
+import { PMP_QUESTIONS } from './questions'
 
-export type PMPAnswers = Record<string, number | 'A' | 'B'>
-
-export type PMPResult = {
-  scores: Record<string, number>
-  mbtiType: string
-  motor: string
-  motorFamily: string
-  globalIndex: number
-  pressureIndex: number
-  stabilityIndex: number
-  profiles: Array<{ name: string; value: number }>
-  learningStyle: string
-  coherenceIndex: number
-  lowDims: Array<[string, number]>
-  highDims: Array<[string, number]>
-  globalBand: string
+export type PMPAthlete = {
+  name?: string
+  age?: string
+  sport?: string
+  club?: string
 }
 
-type PMPLikertQuestion = Extract<PMPQuestion, { type: 'likert' }>
-type PMPBinaryQuestion = Extract<PMPQuestion, { type: 'binary' }>
+export type PMPAnswers = Record<string, number | string>
 
-function isLikertQuestion(question: PMPQuestion): question is PMPLikertQuestion {
-  return question.type === 'likert'
+export const PMP_DIMENSIONS = {
+  activation: {
+    label: 'Activation',
+    description: "Capacité à mobiliser son énergie mentale avant et pendant la performance.",
+    low: "Peut traduire un démarrage lent, une prudence excessive ou une difficulté à entrer pleinement dans le défi.",
+    high: "Traduit souvent une bonne capacité à se mettre rapidement en action et à élever son niveau d'intensité.",
+  },
+  attention: {
+    label: 'Attention',
+    description: "Capacité à rester focalisé sur l'essentiel malgré les distractions.",
+    low: "Peut indiquer une dispersion, une difficulté à revenir dans l'instant ou à tenir son repère.",
+    high: 'Traduit souvent une bonne concentration et une capacité à se refocaliser rapidement.',
+  },
+  regulation: {
+    label: 'Régulation',
+    description: 'Capacité à gérer ses émotions et sa tension intérieure.',
+    low: 'Peut signaler une sensibilité marquée au stress, à la frustration ou à l’erreur.',
+    high: 'Traduit souvent une stabilité émotionnelle utile dans les moments exigeants.',
+  },
+  engagement: {
+    label: 'Engagement',
+    description: "Capacité à rester impliqué, volontaire et mobilisé dans l'effort.",
+    low: 'Peut signaler un décrochage intérieur lorsque la difficulté augmente.',
+    high: 'Traduit une forte implication et une présence mentale durable.',
+  },
+  confiance: {
+    label: 'Confiance',
+    description: 'Croyance en ses capacités à répondre présent et à progresser.',
+    low: 'Peut révéler du doute, une fragilité sous pression ou une dépendance trop forte au résultat.',
+    high: 'Traduit une solidité intérieure et un appui mobilisable dans les moments importants.',
+  },
+  resilience: {
+    label: 'Résilience',
+    description: "Capacité à rebondir après l'erreur, l'échec ou le contretemps.",
+    low: 'Peut montrer une tendance à ruminer et à rester bloqué après un passage difficile.',
+    high: 'Traduit une capacité à repartir, apprendre et se reconstruire dans l’action.',
+  },
+  cognition: {
+    label: 'Cognition',
+    description: 'Capacité à comprendre, analyser, anticiper et décider avec lucidité.',
+    low: 'Peut traduire une lecture tardive de la situation ou un manque de recul stratégique.',
+    high: 'Traduit une bonne clarté mentale et une lecture efficace des situations.',
+  },
+  motricite: {
+    label: 'Motricité',
+    description: 'Capacité à ressentir, organiser et ajuster le mouvement.',
+    low: 'Peut signaler peu de repères corporels ou une difficulté à sentir l’ajustement juste.',
+    high: 'Traduit un lien fin entre sensation, geste et efficacité.',
+  },
+} as const
+
+export const MBTI_TO_MOTOR: Record<string, string> = {
+  ESTP: 'D1',
+  ISTP: 'D2',
+  ESTJ: 'D3',
+  ISTJ: 'D4',
+  ESFP: 'G1',
+  ISFP: 'G2',
+  ESFJ: 'G3',
+  ISFJ: 'G4',
+  ENFP: 'R1',
+  INFP: 'R2',
+  ENFJ: 'R3',
+  INFJ: 'R4',
+  ENTP: 'C1',
+  INTP: 'C2',
+  ENTJ: 'C3',
+  INTJ: 'C4',
 }
 
-function isBinaryQuestion(question: PMPQuestion): question is PMPBinaryQuestion {
-  return question.type === 'binary'
+export const PMP_PROFILES: Record<string, string[]> = {
+  Compétiteur: ['activation', 'engagement', 'confiance'],
+  Stratège: ['cognition', 'attention', 'regulation'],
+  Créatif: ['cognition', 'activation', 'motricite'],
+  Régulateur: ['regulation', 'attention', 'resilience'],
+  Endurant: ['resilience', 'engagement', 'confiance'],
+  Méthodique: ['attention', 'motricite', 'cognition'],
 }
 
-export function computePMPResults(answers: PMPAnswers): PMPResult {
+export function pmpScoreBand(score: number) {
+  if (score >= 80) return 'force mentale'
+  if (score >= 60) return 'zone solide'
+  if (score >= 40) return 'zone moyenne'
+  return 'zone de travail'
+}
+
+export function computePmpResults(athlete: PMPAthlete, answers: PMPAnswers) {
+  const dims = Object.keys(PMP_DIMENSIONS) as Array<keyof typeof PMP_DIMENSIONS>
   const scores: Record<string, number> = {}
-  const dims = Object.keys(PMP_DIMENSIONS)
 
   dims.forEach((key) => {
     const items = PMP_QUESTIONS.filter(
-      (q): q is PMPLikertQuestion => isLikertQuestion(q) && q.dimension === key
+      (q) => q.type === 'likert' && q.dimension === key
     )
 
     const total = items.reduce((sum, q) => {
@@ -50,7 +115,7 @@ export function computePMPResults(answers: PMPAnswers): PMPResult {
 
   const axisScores = { ei: 0, sn: 0, tf: 0, jp: 0 }
 
-  PMP_QUESTIONS.filter(isBinaryQuestion).forEach((q) => {
+  PMP_QUESTIONS.filter((q) => q.type === 'binary').forEach((q) => {
     const ans = answers[q.id]
     if (ans === 'A') axisScores[q.axis] += 1
     if (ans === 'B') axisScores[q.axis] -= 1
@@ -63,7 +128,8 @@ export function computePMPResults(answers: PMPAnswers): PMPResult {
     (axisScores.jp >= 0 ? 'J' : 'P')
 
   const motor = MBTI_TO_MOTOR[mbtiType] || '—'
-  const motorFamily = motor !== '—' ? MOTOR_FAMILIES[motor[0]] || '—' : '—'
+  const motorFamilies: Record<string, string> = { D: 'ST', G: 'SF', R: 'NF', C: 'NT' }
+  const motorFamily = motor !== '—' ? motorFamilies[motor[0]] : '—'
 
   const globalIndex = Math.round(
     (scores.activation * 1 +
@@ -89,7 +155,7 @@ export function computePMPResults(answers: PMPAnswers): PMPResult {
     .map(([name, profileDims]) => ({
       name,
       value: Math.round(
-        profileDims.reduce((s, d) => s + scores[d], 0) / profileDims.length
+        profileDims.reduce((sum, dim) => sum + scores[dim], 0) / profileDims.length
       ),
     }))
     .sort((a, b) => b.value - a.value)
@@ -99,7 +165,7 @@ export function computePMPResults(answers: PMPAnswers): PMPResult {
     ['Expérientiel', Math.round((scores.motricite + scores.activation) / 2)],
     ['Compétitif', Math.round((scores.engagement + scores.activation) / 2)],
     ['Méthodique', Math.round((scores.attention + scores.motricite) / 2)],
-  ].sort((a, b) => Number(b[1]) - Number(a[1]))[0][0] as string
+  ].sort((a, b) => b[1] - a[1])[0][0]
 
   let coherenceIndex = Math.round((scores.motricite + scores.cognition) / 2)
   if (['R', 'C'].includes(motor[0]) && scores.cognition >= 60) coherenceIndex += 8
@@ -109,16 +175,13 @@ export function computePMPResults(answers: PMPAnswers): PMPResult {
   const lowDims = Object.entries(scores).sort((a, b) => a[1] - b[1]).slice(0, 3)
   const highDims = Object.entries(scores).sort((a, b) => b[1] - a[1]).slice(0, 3)
 
-  const globalBand =
-    globalIndex >= 80
-      ? 'mental performant'
-      : globalIndex >= 65
-      ? 'mental solide'
-      : globalIndex >= 50
-      ? 'mental en développement'
-      : 'mental fragile'
-
   return {
+    athlete: {
+      name: athlete.name || 'Sportif A4P',
+      age: athlete.age || '',
+      sport: athlete.sport || '',
+      club: athlete.club || '',
+    },
     scores,
     mbtiType,
     motor,
@@ -131,6 +194,13 @@ export function computePMPResults(answers: PMPAnswers): PMPResult {
     coherenceIndex,
     lowDims,
     highDims,
-    globalBand,
+    globalBand:
+      globalIndex >= 80
+        ? 'mental performant'
+        : globalIndex >= 65
+        ? 'mental solide'
+        : globalIndex >= 50
+        ? 'mental en développement'
+        : 'mental fragile',
   }
 }
