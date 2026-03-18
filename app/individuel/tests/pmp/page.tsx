@@ -32,6 +32,7 @@ export default function IndividualPmpPage() {
   const [accessDenied, setAccessDenied] = useState(false)
   const [error, setError] = useState('')
   const [screen, setScreen] = useState<'intro' | 'test' | 'report'>('intro')
+  const [submitting, setSubmitting] = useState(false)
 
   const [athlete, setAthlete] = useState<AthleteState>({
     name: '',
@@ -42,12 +43,12 @@ export default function IndividualPmpPage() {
 
   const [answers, setAnswers] = useState<AnswersState>({})
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     const init = async () => {
       try {
         const raw = localStorage.getItem('a4p_individual_user')
+
         if (!raw) {
           router.replace('/individuel/connexion')
           return
@@ -55,7 +56,7 @@ export default function IndividualPmpPage() {
 
         const parsed = JSON.parse(raw) as IndividualUser
 
-        if (!parsed?.email || !parsed?.has_access) {
+        if (!parsed?.id || !parsed?.email || !parsed?.has_access) {
           router.replace('/individuel/connexion')
           return
         }
@@ -71,15 +72,15 @@ export default function IndividualPmpPage() {
           }),
         })
 
-        const result = await response.json()
+        const payload = await response.json()
 
-        if (!response.ok || !result?.ok) {
+        if (!response.ok || !payload?.ok) {
           setAccessDenied(true)
-          setError(result?.message || 'Accès PMP refusé.')
+          setError(payload?.message || 'Accès PMP refusé.')
 
-          if (result?.user) {
-            localStorage.setItem('a4p_individual_user', JSON.stringify(result.user))
-            setUser(result.user)
+          if (payload?.user) {
+            localStorage.setItem('a4p_individual_user', JSON.stringify(payload.user))
+            setUser(payload.user)
           }
 
           setChecking(false)
@@ -87,8 +88,8 @@ export default function IndividualPmpPage() {
         }
 
         setChecking(false)
-      } catch (err) {
-        console.error(err)
+      } catch (e) {
+        console.error(e)
         setAccessDenied(true)
         setError('Erreur technique de chargement du PMP.')
         setChecking(false)
@@ -108,17 +109,18 @@ export default function IndividualPmpPage() {
     return computePmpResults(athlete, answers)
   }, [athlete, answers])
 
-  function setLikertAnswer(value: number) {
+  function answerLikert(value: number) {
     setAnswers((prev) => ({ ...prev, [currentQuestion.id]: value }))
   }
 
-  function setBinaryAnswer(value: 'A' | 'B') {
+  function answerBinary(value: 'A' | 'B') {
     setAnswers((prev) => ({ ...prev, [currentQuestion.id]: value }))
   }
 
-  function goNext() {
-    const answer = answers[currentQuestion.id]
-    if (answer === undefined || answer === '') {
+  function nextQuestion() {
+    const value = answers[currentQuestion.id]
+
+    if (value === undefined || value === '') {
       setError('Merci de répondre avant de continuer.')
       return
     }
@@ -135,21 +137,21 @@ export default function IndividualPmpPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  function goPrev() {
+  function prevQuestion() {
     if (currentIndex === 0) return
     setError('')
     setCurrentIndex((prev) => prev - 1)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  async function handleSubmitFinal() {
+  async function validatePmp() {
     if (!user) return
 
     setSubmitting(true)
     setError('')
 
     try {
-      const response = await fetch('/api/individual-pmp-submit', {
+      const response = await fetch('/api/pmp-submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -173,8 +175,8 @@ export default function IndividualPmpPage() {
       }
 
       router.push('/individuel/dashboard')
-    } catch (err) {
-      console.error(err)
+    } catch (e) {
+      console.error(e)
       setError('Erreur technique. Merci de réessayer.')
       setSubmitting(false)
     }
@@ -182,7 +184,7 @@ export default function IndividualPmpPage() {
 
   if (checking) {
     return (
-      <main style={loadingMainStyle}>
+      <main style={loadingStyle}>
         Vérification de votre accès PMP...
       </main>
     )
@@ -192,19 +194,19 @@ export default function IndividualPmpPage() {
     return (
       <main style={pageStyle}>
         <div style={containerStyle}>
-          <Card>
+          <section style={cardStyle}>
             <img src="/logo-a4p.png" alt="Académie de Performances" style={logoStyle} />
-            <h1 style={deniedTitleStyle}>Accès PMP indisponible</h1>
-            <p style={deniedTextStyle}>{error || 'Votre compte ne peut pas ouvrir le PMP.'}</p>
-            <div style={{ display: 'grid', gap: 14, marginTop: 26 }}>
-              <Link href="/individuel/dashboard" style={primaryButtonStyle}>
+            <h1 style={titleStyle}>Accès PMP indisponible</h1>
+            <p style={textStyle}>{error || 'Votre compte ne peut pas ouvrir le PMP.'}</p>
+            <div style={{ display: 'grid', gap: 14, marginTop: 24 }}>
+              <Link href="/individuel/dashboard" style={primaryLinkStyle}>
                 Retour au tableau de bord
               </Link>
-              <Link href="/individuel" style={secondaryButtonStyle}>
-                Revenir au parcours individuel
+              <Link href="/individuel" style={secondaryLinkStyle}>
+                Retour au parcours individuel
               </Link>
             </div>
-          </Card>
+          </section>
         </div>
       </main>
     )
@@ -214,45 +216,63 @@ export default function IndividualPmpPage() {
     return (
       <main style={pageStyle}>
         <div style={containerStyle}>
-          <Hero
-            title={'Profil Mental de\nPerformance'}
-            eyebrow="PMP intégré et sécurisé"
-            text={`Bonjour ${user?.email}. Vous allez passer le PMP directement dans votre espace sécurisé A4P. Une seule passation est autorisée pour ce compte.`}
-          />
+          <section style={heroStyle}>
+            <img src="/logo-a4p.png" alt="Académie de Performances" style={heroLogoStyle} />
+            <div style={heroEyebrowStyle}>TEST PMP SÉCURISÉ</div>
+            <h1 style={heroTitleStyle}>Profil Mental de Performance</h1>
+            <p style={heroTextStyle}>
+              Bonjour {user?.email}. Votre accès PMP est ouvert pour une passation contrôlée
+              et unique.
+            </p>
+          </section>
 
-          <Card>
+          <section style={cardStyle}>
             <h2 style={sectionTitleStyle}>Avant de commencer</h2>
 
-            <div style={gridStyle}>
-              <Field
-                label="Nom du sportif"
-                value={athlete.name}
-                onChange={(v) => setAthlete((prev) => ({ ...prev, name: v }))}
-                placeholder="Prénom Nom"
-              />
-              <Field
-                label="Âge"
-                value={athlete.age}
-                onChange={(v) => setAthlete((prev) => ({ ...prev, age: v }))}
-                placeholder="15"
-              />
-              <Field
-                label="Sport"
-                value={athlete.sport}
-                onChange={(v) => setAthlete((prev) => ({ ...prev, sport: v }))}
-                placeholder="Football, rugby, tennis..."
-              />
-              <Field
-                label="Club / structure"
-                value={athlete.club}
-                onChange={(v) => setAthlete((prev) => ({ ...prev, club: v }))}
-                placeholder="Club, lycée, académie..."
-              />
+            <div style={formGridStyle}>
+              <label style={labelStyle}>
+                <span>Nom du sportif</span>
+                <input
+                  value={athlete.name}
+                  onChange={(e) => setAthlete((prev) => ({ ...prev, name: e.target.value }))}
+                  placeholder="Prénom Nom"
+                  style={inputStyle}
+                />
+              </label>
+
+              <label style={labelStyle}>
+                <span>Âge</span>
+                <input
+                  value={athlete.age}
+                  onChange={(e) => setAthlete((prev) => ({ ...prev, age: e.target.value }))}
+                  placeholder="15"
+                  style={inputStyle}
+                />
+              </label>
+
+              <label style={labelStyle}>
+                <span>Sport</span>
+                <input
+                  value={athlete.sport}
+                  onChange={(e) => setAthlete((prev) => ({ ...prev, sport: e.target.value }))}
+                  placeholder="Football, rugby, tennis..."
+                  style={inputStyle}
+                />
+              </label>
+
+              <label style={labelStyle}>
+                <span>Club / structure</span>
+                <input
+                  value={athlete.club}
+                  onChange={(e) => setAthlete((prev) => ({ ...prev, club: e.target.value }))}
+                  placeholder="Club, lycée, académie..."
+                  style={inputStyle}
+                />
+              </label>
             </div>
 
-            <div style={noteStyle}>
-              Le PMP comprend 136 questions. Il produit une lecture mentale A4P, un profil dominant,
-              une équivalence cognitive inspirée MBTI et une première synthèse exploitable.
+            <div style={infoBoxStyle}>
+              Le PMP comprend 136 questions et produit une première synthèse mentale A4P.
             </div>
 
             <div style={{ display: 'grid', gap: 14, marginTop: 22 }}>
@@ -263,16 +283,16 @@ export default function IndividualPmpPage() {
                   setError('')
                   window.scrollTo({ top: 0, behavior: 'smooth' })
                 }}
-                style={primaryButtonStyleAsButton}
+                style={primaryButtonStyle}
               >
                 Commencer mon PMP
               </button>
 
-              <Link href="/individuel/dashboard" style={secondaryButtonStyle}>
+              <Link href="/individuel/dashboard" style={secondaryLinkStyle}>
                 Retour au tableau de bord
               </Link>
             </div>
-          </Card>
+          </section>
         </div>
       </main>
     )
@@ -284,41 +304,42 @@ export default function IndividualPmpPage() {
     return (
       <main style={pageStyle}>
         <div style={containerStyle}>
-          <Hero
-            title={`Question ${currentIndex + 1} / ${PMP_QUESTIONS.length}`}
-            eyebrow={currentQuestion.type === 'likert' ? `Dimension ${currentQuestion.label}` : 'Lecture cognitive'}
-            text={`${progress}% du questionnaire complété`}
-          />
+          <section style={heroStyle}>
+            <img src="/logo-a4p.png" alt="Académie de Performances" style={heroLogoStyle} />
+            <div style={heroEyebrowStyle}>
+              QUESTION {currentIndex + 1} / {PMP_QUESTIONS.length}
+            </div>
+            <h1 style={heroTitleStyle}>
+              {currentQuestion.type === 'likert'
+                ? PMP_DIMENSIONS[currentQuestion.dimension].label
+                : 'Lecture cognitive'}
+            </h1>
+            <p style={heroTextStyle}>{progress}% du questionnaire complété</p>
+          </section>
 
-          <Card>
-            <div style={progressWrapStyle}>
-              <div style={progressTrackStyle}>
-                <div style={{ ...progressFillStyle, width: `${progress}%` }} />
-              </div>
+          <section style={cardStyle}>
+            <div style={progressTrackStyle}>
+              <div style={{ ...progressFillStyle, width: `${progress}%` }} />
             </div>
 
             <h2 style={questionTitleStyle}>{currentQuestion.text}</h2>
 
-            {'label' in currentQuestion ? (
-              <p style={questionDescriptionStyle}>
-                {PMP_DIMENSIONS[currentQuestion.dimension].description}
-              </p>
-            ) : (
-              <p style={questionDescriptionStyle}>
-                Cette partie affine la lecture cognitive inspirée MBTI.
-              </p>
-            )}
+            <p style={questionTextStyle}>
+              {currentQuestion.type === 'likert'
+                ? PMP_DIMENSIONS[currentQuestion.dimension].description
+                : 'Cette partie affine la lecture cognitive inspirée MBTI.'}
+            </p>
 
             {currentQuestion.type === 'likert' ? (
-              <div style={{ display: 'grid', gap: 12, marginTop: 20 }}>
+              <div style={{ display: 'grid', gap: 12, marginTop: 22 }}>
                 {[1, 2, 3, 4, 5].map((value) => {
-                  const labels = {
+                  const labels: Record<number, string> = {
                     1: '1 — Pas du tout d’accord',
                     2: '2 — Plutôt pas d’accord',
                     3: '3 — Mitigé',
                     4: '4 — Plutôt d’accord',
                     5: '5 — Tout à fait d’accord',
-                  } as const
+                  }
 
                   const isSelected = selected === value
 
@@ -326,19 +347,19 @@ export default function IndividualPmpPage() {
                     <button
                       key={value}
                       type="button"
-                      onClick={() => setLikertAnswer(value)}
+                      onClick={() => answerLikert(value)}
                       style={{
                         ...answerButtonStyle,
                         ...(isSelected ? answerButtonSelectedStyle : {}),
                       }}
                     >
-                      {labels[value as 1 | 2 | 3 | 4 | 5]}
+                      {labels[value]}
                     </button>
                   )
                 })}
               </div>
             ) : (
-              <div style={{ display: 'grid', gap: 12, marginTop: 20 }}>
+              <div style={{ display: 'grid', gap: 12, marginTop: 22 }}>
                 {(['A', 'B'] as const).map((choice) => {
                   const isSelected = selected === choice
                   const text =
@@ -348,7 +369,7 @@ export default function IndividualPmpPage() {
                     <button
                       key={choice}
                       type="button"
-                      onClick={() => setBinaryAnswer(choice)}
+                      onClick={() => answerBinary(choice)}
                       style={{
                         ...answerButtonStyle,
                         ...(isSelected ? answerButtonSelectedStyle : {}),
@@ -365,7 +386,7 @@ export default function IndividualPmpPage() {
             {error ? <div style={errorBoxStyle}>{error}</div> : null}
 
             <div style={{ display: 'grid', gap: 14, marginTop: 24 }}>
-              <button type="button" onClick={goNext} style={primaryButtonStyleAsButton}>
+              <button type="button" onClick={nextQuestion} style={primaryButtonStyle}>
                 {currentIndex === PMP_QUESTIONS.length - 1
                   ? 'Voir ma synthèse PMP'
                   : 'Question suivante'}
@@ -373,17 +394,17 @@ export default function IndividualPmpPage() {
 
               <button
                 type="button"
-                onClick={goPrev}
+                onClick={prevQuestion}
                 disabled={currentIndex === 0}
                 style={{
-                  ...secondaryButtonStyleAsButton,
+                  ...secondaryButtonStyle,
                   opacity: currentIndex === 0 ? 0.45 : 1,
                 }}
               >
                 Question précédente
               </button>
             </div>
-          </Card>
+          </section>
         </div>
       </main>
     )
@@ -392,30 +413,46 @@ export default function IndividualPmpPage() {
   return (
     <main style={pageStyle}>
       <div style={containerStyle}>
-        <Hero
-          title={'Synthèse PMP\nA4P'}
-          eyebrow="Lecture immédiate avant validation"
-          text="Relisez votre synthèse. La validation finale enregistrera votre résultat et verrouillera le PMP pour ce compte."
-        />
+        <section style={heroStyle}>
+          <img src="/logo-a4p.png" alt="Académie de Performances" style={heroLogoStyle} />
+          <div style={heroEyebrowStyle}>SYNTHÈSE PMP</div>
+          <h1 style={heroTitleStyle}>Votre lecture immédiate</h1>
+          <p style={heroTextStyle}>
+            Relisez votre synthèse. La validation finale enregistrera votre résultat et verrouillera
+            le PMP pour ce compte.
+          </p>
+        </section>
 
-        <Card>
-          <h2 style={sectionTitleStyle}>Portrait global</h2>
+        <section style={cardStyle}>
+          <h2 style={sectionTitleStyle}>Indicateurs clés</h2>
 
           <div style={statsGridStyle}>
-            <StatCard label="Indice global A4P" value={`${result.globalIndex}/100`} />
-            <StatCard label="Indice pression" value={`${result.pressureIndex}/100`} />
-            <StatCard label="Indice stabilité" value={`${result.stabilityIndex}/100`} />
-            <StatCard label="Type cognitif probable" value={result.mbtiType} />
+            <div style={statCardStyle}>
+              <div style={statLabelStyle}>Indice global A4P</div>
+              <div style={statValueStyle}>{result.globalIndex}/100</div>
+            </div>
+            <div style={statCardStyle}>
+              <div style={statLabelStyle}>Indice pression</div>
+              <div style={statValueStyle}>{result.pressureIndex}/100</div>
+            </div>
+            <div style={statCardStyle}>
+              <div style={statLabelStyle}>Indice stabilité</div>
+              <div style={statValueStyle}>{result.stabilityIndex}/100</div>
+            </div>
+            <div style={statCardStyle}>
+              <div style={statLabelStyle}>Type cognitif probable</div>
+              <div style={statValueStyle}>{result.mbtiType}</div>
+            </div>
           </div>
 
-          <div style={{ marginTop: 18, ...noteStyle }}>
+          <div style={infoBoxStyle}>
             Profil principal : <strong>{result.profiles[0].name}</strong> — Profil secondaire :{' '}
-            <strong>{result.profiles[1].name}</strong> — Préférence motrice associée :{' '}
+            <strong>{result.profiles[1].name}</strong> — Préférence motrice :{' '}
             <strong>{result.motor}</strong>
           </div>
-        </Card>
+        </section>
 
-        <Card>
+        <section style={cardStyle}>
           <h2 style={sectionTitleStyle}>Dimensions mentales</h2>
 
           <div style={{ display: 'grid', gap: 16 }}>
@@ -440,12 +477,11 @@ export default function IndividualPmpPage() {
               </div>
             ))}
           </div>
-        </Card>
+        </section>
 
-        <Card>
-          <h2 style={sectionTitleStyle}>Axes prioritaires de progression</h2>
-
-          <ul style={reportListStyle}>
+        <section style={cardStyle}>
+          <h2 style={sectionTitleStyle}>Axes prioritaires</h2>
+          <ul style={listStyle}>
             {result.lowDims.map(([key, score]) => (
               <li key={key}>
                 <strong>{PMP_DIMENSIONS[key as keyof typeof PMP_DIMENSIONS].label}</strong> — {score}
@@ -453,17 +489,17 @@ export default function IndividualPmpPage() {
               </li>
             ))}
           </ul>
-        </Card>
+        </section>
 
         {error ? <div style={errorBoxStyle}>{error}</div> : null}
 
         <div style={{ display: 'grid', gap: 14 }}>
           <button
             type="button"
-            onClick={handleSubmitFinal}
+            onClick={validatePmp}
             disabled={submitting}
             style={{
-              ...primaryButtonStyleAsButton,
+              ...primaryButtonStyle,
               opacity: submitting ? 0.7 : 1,
             }}
           >
@@ -479,76 +515,13 @@ export default function IndividualPmpPage() {
               setError('')
               window.scrollTo({ top: 0, behavior: 'smooth' })
             }}
-            style={secondaryButtonStyleAsButton}
+            style={secondaryButtonStyle}
           >
             Revenir au questionnaire
           </button>
         </div>
       </div>
     </main>
-  )
-}
-
-function Hero({
-  eyebrow,
-  title,
-  text,
-}: {
-  eyebrow: string
-  title: string
-  text: string
-}) {
-  return (
-    <section style={heroStyle}>
-      <img src="/logo-a4p.png" alt="Académie de Performances" style={heroLogoStyle} />
-      <div style={heroEyebrowStyle}>{eyebrow}</div>
-      <h1 style={heroTitleStyle}>
-        {title.split('\n').map((line, index) => (
-          <span key={index}>
-            {line}
-            {index < title.split('\n').length - 1 ? <br /> : null}
-          </span>
-        ))}
-      </h1>
-      <p style={heroTextStyle}>{text}</p>
-    </section>
-  )
-}
-
-function Card({ children }: { children: React.ReactNode }) {
-  return <section style={cardStyle}>{children}</section>
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-  placeholder: string
-}) {
-  return (
-    <label style={{ display: 'grid', gap: 10 }}>
-      <span style={{ color: '#22366c', fontSize: 18, fontWeight: 800 }}>{label}</span>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        style={inputStyle}
-      />
-    </label>
-  )
-}
-
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={statCardStyle}>
-      <div style={statLabelStyle}>{label}</div>
-      <div style={statValueStyle}>{value}</div>
-    </div>
   )
 }
 
@@ -563,6 +536,19 @@ const containerStyle: React.CSSProperties = {
   margin: '0 auto',
   display: 'grid',
   gap: 22,
+}
+
+const loadingStyle: React.CSSProperties = {
+  minHeight: '100vh',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: 'linear-gradient(180deg, #edf3ff 0%, #f7f9ff 100%)',
+  color: '#22366c',
+  fontSize: 20,
+  fontWeight: 700,
+  padding: 24,
+  textAlign: 'center',
 }
 
 const heroStyle: React.CSSProperties = {
@@ -623,7 +609,7 @@ const logoStyle: React.CSSProperties = {
   borderRadius: 12,
 }
 
-const deniedTitleStyle: React.CSSProperties = {
+const titleStyle: React.CSSProperties = {
   margin: 0,
   fontSize: 36,
   lineHeight: 1.1,
@@ -631,7 +617,7 @@ const deniedTitleStyle: React.CSSProperties = {
   color: '#22366c',
 }
 
-const deniedTextStyle: React.CSSProperties = {
+const textStyle: React.CSSProperties = {
   margin: '22px auto 0',
   maxWidth: 620,
   fontSize: 22,
@@ -647,10 +633,18 @@ const sectionTitleStyle: React.CSSProperties = {
   color: '#22366c',
 }
 
-const gridStyle: React.CSSProperties = {
+const formGridStyle: React.CSSProperties = {
   display: 'grid',
   gap: 16,
   marginTop: 18,
+}
+
+const labelStyle: React.CSSProperties = {
+  display: 'grid',
+  gap: 10,
+  color: '#22366c',
+  fontSize: 18,
+  fontWeight: 800,
 }
 
 const inputStyle: React.CSSProperties = {
@@ -665,7 +659,7 @@ const inputStyle: React.CSSProperties = {
   outline: 'none',
 }
 
-const noteStyle: React.CSSProperties = {
+const infoBoxStyle: React.CSSProperties = {
   marginTop: 18,
   padding: '18px 20px',
   borderRadius: 22,
@@ -705,10 +699,10 @@ const secondaryButtonStyle: React.CSSProperties = {
   color: '#22366c',
   fontSize: 22,
   fontWeight: 900,
-  textDecoration: 'none',
+  cursor: 'pointer',
 }
 
-const primaryButtonStyleAsButton: React.CSSProperties = {
+const primaryLinkStyle: React.CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -720,10 +714,10 @@ const primaryButtonStyleAsButton: React.CSSProperties = {
   color: '#ffffff',
   fontSize: 22,
   fontWeight: 900,
-  cursor: 'pointer',
+  textDecoration: 'none',
 }
 
-const secondaryButtonStyleAsButton: React.CSSProperties = {
+const secondaryLinkStyle: React.CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -735,24 +729,7 @@ const secondaryButtonStyleAsButton: React.CSSProperties = {
   color: '#22366c',
   fontSize: 22,
   fontWeight: 900,
-  cursor: 'pointer',
-}
-
-const loadingMainStyle: React.CSSProperties = {
-  minHeight: '100vh',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  background: 'linear-gradient(180deg, #edf3ff 0%, #f7f9ff 100%)',
-  color: '#22366c',
-  fontSize: 20,
-  fontWeight: 700,
-  padding: 24,
-  textAlign: 'center',
-}
-
-const progressWrapStyle: React.CSSProperties = {
-  marginBottom: 20,
+  textDecoration: 'none',
 }
 
 const progressTrackStyle: React.CSSProperties = {
@@ -761,6 +738,7 @@ const progressTrackStyle: React.CSSProperties = {
   borderRadius: 999,
   background: '#e6edf8',
   overflow: 'hidden',
+  marginBottom: 22,
 }
 
 const progressFillStyle: React.CSSProperties = {
@@ -777,7 +755,7 @@ const questionTitleStyle: React.CSSProperties = {
   fontWeight: 900,
 }
 
-const questionDescriptionStyle: React.CSSProperties = {
+const questionTextStyle: React.CSSProperties = {
   margin: '14px 0 0',
   color: '#5d6b8a',
   fontSize: 21,
@@ -865,7 +843,7 @@ const miniFillStyle: React.CSSProperties = {
   background: 'linear-gradient(90deg, #21366f 0%, #4764b0 100%)',
 }
 
-const reportListStyle: React.CSSProperties = {
+const listStyle: React.CSSProperties = {
   margin: '18px 0 0',
   paddingLeft: 24,
   color: '#5d6b8a',
